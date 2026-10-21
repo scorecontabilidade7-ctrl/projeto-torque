@@ -2,6 +2,9 @@
 
 Sistema financeiro completo (Fluxo de Caixa, DFC, Plano de Contas, Conciliação Bancária, Auditoria) conectado em nuvem com o **Supabase** (Projeto: *Agente de IA*).
 
+- 🌐 **Aplicação no Ar (Produção)**: [https://projeto-torque.vercel.app](https://projeto-torque.vercel.app)
+- 🐙 **Repositório GitHub**: [https://github.com/scorecontabilidade7-ctrl/projeto-torque](https://github.com/scorecontabilidade7-ctrl/projeto-torque)
+
 ---
 
 ## ☁️ Conexão com a Nuvem (Supabase)
