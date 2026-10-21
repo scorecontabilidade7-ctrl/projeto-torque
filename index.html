@@ -4649,9 +4649,13 @@ async function authSubmit(ev) {
       await new Promise(r => setTimeout(r, 450)); await torqueLoginAnimation(); enterApp(true); return;
     } catch (e) { cloudBad = !e.net; b0.disabled = false; b0.className = 'btn pri'; b0.textContent = 'Entrar'; }
   }
-  /* >>> VALIDAÇÃO REAL DO USUÁRIO: hoje usa o cadastro local (Configurações > Usuários). <<< */
+  /* >>> VALIDAÇÃO DO USUÁRIO (sincronizado com Supabase) <<< */
   const key = normU(email);
-  const matches = S.users.filter(x => x.passwordHash && [x.email, (x.email || '').split('@')[0], x.name, (x.name || '').split(' ')[0]].some(v => v && normU(v) === key));
+  let matches = S.users.filter(x => x.passwordHash && [x.email, (x.email || '').split('@')[0], x.name, (x.name || '').split(' ')[0]].some(v => v && normU(v) === key));
+  if (!matches.length && CLOUD.on) {
+    try { await CLOUD.syncUsers(); } catch (_) { }
+    matches = S.users.filter(x => x.passwordHash && [x.email, (x.email || '').split('@')[0], x.name, (x.name || '').split(' ')[0]].some(v => v && normU(v) === key));
+  }
   if (!matches.length) return authFail(cloudBad ? 'Senha incorreta. Verifique seus dados e tente novamente.' : 'Usuário não possui cadastro. Verifique seus dados ou solicite acesso ao administrador.');
   const active = matches.filter(x => x.status !== 'inactive');
   if (!active.length) return authFail('Este usuário está desativado. Solicite acesso ao administrador.');
@@ -4728,6 +4732,7 @@ function userForm(id) {
     const u = u0 ? { ...u0 } : { id: uid(), role: 'Usuário', createdAt: new Date().toISOString() };
     u.name = d.name.trim(); u.email = email;
     u.status = u0 && u0.id === S.me ? 'active' : (d.active ? 'active' : 'inactive');
+    u.updatedAt = new Date().toISOString();
     if (d.pass) { u.salt = uid(); u.passwordHash = await hashPassword(d.pass, u.salt); }
     await S.repo.putUser(u);
     await commitOps([aud(u0 ? 'EDITAR USUÁRIO' : 'NOVO USUÁRIO', 'user', u.id, u0 ? { email: u0.email, status: u0.status } : null, { email: u.email, status: u.status, senhaAlterada: !!d.pass }, u.name)]);
@@ -4825,7 +4830,9 @@ const CLOUD = {
       this.sb = this.client();
       const { data } = await this.sb.auth.getSession();
       this.session = data && data.session;
+      this.subscribe();
       this.setStatus('idle');
+      await this.syncUsers();
       return true;
     }
     catch (e) { this.sb = null; this.setStatus('offline', e.message); return false; }
@@ -4872,14 +4879,68 @@ const CLOUD = {
       if (this.outbox.size) this.schedule(100); else this.setStatus('ok');
     } catch (e) { this.flushing = false; this.setStatus('err', e.message || String(e)); this.schedule(10000); }
   },
+  /* ---------------- sincronização de usuários na nuvem */
+  async pushUser(u) {
+    if (!this.on || !this.sb) return;
+    try {
+      const row = { store: 'users', key: String(u.id), value: u, updated_by: this.cid, updated_at: new Date().toISOString() };
+      await this.sb.from('torque_docs').upsert(row, { onConflict: 'store,key' });
+    } catch (e) { console.warn('Falha ao subir usuário na nuvem:', e); }
+  },
+  async deleteUser(id) {
+    if (!this.on || !this.sb) return;
+    try {
+      await this.sb.from('torque_docs').delete().eq('store', 'users').eq('key', String(id));
+    } catch (e) { console.warn('Falha ao excluir usuário na nuvem:', e); }
+  },
+  async syncUsers() {
+    if (!this.on || !this.sb) return;
+    try {
+      const { data, error } = await this.sb.from('torque_docs').select('value').eq('store', 'users');
+      if (error || !data) return;
+      const remoteUsers = data.map(r => r.value).filter(Boolean);
+      const localUsers = await S.repo.allUsers();
+      const remoteMap = new Map(remoteUsers.map(u => [u.id, u]));
+      const localMap = new Map(localUsers.map(u => [u.id, u]));
+
+      // 1. Sobe usuários locais que ainda não estão na nuvem ou estão mais recentes
+      for (const lu of localUsers) {
+        if (!remoteMap.has(lu.id)) {
+          await this.pushUser(lu);
+        } else {
+          const ru = remoteMap.get(lu.id);
+          const lTime = new Date(lu.updatedAt || lu.createdAt || 0).getTime();
+          const rTime = new Date(ru.updatedAt || ru.createdAt || 0).getTime();
+          if (lTime > rTime) await this.pushUser(lu);
+        }
+      }
+
+      // 2. Grava no IndexedDB local os usuários da nuvem novos ou atualizados
+      for (const ru of remoteUsers) {
+        const lu = localMap.get(ru.id);
+        const lTime = lu ? new Date(lu.updatedAt || lu.createdAt || 0).getTime() : 0;
+        const rTime = new Date(ru.updatedAt || ru.createdAt || 0).getTime();
+        if (!lu || rTime > lTime) {
+          await IDBRepo.prototype.putUser.call(S.repo, ru);
+        }
+      }
+
+      S.users = await S.repo.allUsers();
+      if (typeof renderCad === 'function' && UI && UI.cad && UI.cad.tab === 'users' && UI.route === 'config') {
+        renderCad();
+      }
+    } catch (e) { console.warn('Erro em syncUsers:', e); }
+  },
+
   /** substitui toda a nuvem pelo que há neste computador (restauração, redefinição, primeira subida) */
   async pushAll(clearFirst = true) {
     if (!this.sb) return;
     this.setStatus('sync'); this.outbox.clear(); this.persist();
     try {
-      if (clearFirst) { const { error } = await this.sb.from('torque_docs').delete().neq('store', '__none__'); if (error) throw error; }
+      if (clearFirst) { const { error } = await this.sb.from('torque_docs').delete().neq('store', 'users'); if (error) throw error; }
       const rows = []; for (const st of Object.keys(STORES)) for (const v of await S.repo.all(st)) rows.push(this.rowOf(st, v));
       for (let i = 0; i < rows.length; i += 400) { const { error } = await this.sb.from('torque_docs').upsert(rows.slice(i, i + 400), { onConflict: 'store,key' }); if (error) throw error; }
+      await this.syncUsers();
       this.setStatus('ok');
     } catch (e) { this.setStatus('err', e.message || String(e)); throw e; }
   },
@@ -4930,19 +4991,39 @@ const CLOUD = {
         if (useCloud) await this.applyRemote(rows); else await this.pushAll(true);
       }
       try { localStorage.setItem(this.LINK, this.cfg.url); } catch (_) { }
+      await this.syncUsers();
       this.subscribe(); this.setStatus('ok');
       if (UI.route) ROUTES[UI.route].render();
     } catch (e) { this.setStatus('err', (e && e.message) || String(e)); }
   },
   subscribe() {
     this.stop();
+    if (!this.sb) return;
     this.ch = this.sb.channel('torque-docs-' + this.cid).on('postgres_changes', { event: '*', schema: 'public', table: 'torque_docs' }, p => this.onChange(p)).subscribe(st => { if (st === 'SUBSCRIBED') cloudPill(); });
   },
   stop() { if (this.ch && this.sb) { try { this.sb.removeChannel(this.ch); } catch (_) { } } this.ch = null; },
   async onChange(p) {
     const n = p.new && p.new.store ? p.new : null, o = p.old && p.old.store ? p.old : null;
     if (n && n.updated_by === this.cid) return;          // eco da nossa própria gravação
-    const st = (n || o).store; if (!STORES[st]) return;
+    const st = (n || o).store;
+    if (st === 'users') {
+      if (p.eventType === 'DELETE') {
+        const delId = o ? o.key : (p.old && p.old.key);
+        if (delId) {
+          await IDBRepo.prototype.delUser.call(S.repo, delId);
+          S.users = S.users.filter(u => u.id !== delId);
+        }
+      } else if (n && n.value) {
+        await IDBRepo.prototype.putUser.call(S.repo, n.value);
+        const idx = S.users.findIndex(u => u.id === n.value.id);
+        if (idx >= 0) S.users[idx] = n.value; else S.users.push(n.value);
+      }
+      if (typeof renderCad === 'function' && UI && UI.cad && UI.cad.tab === 'users' && UI.route === 'config') {
+        renderCad();
+      }
+      return;
+    }
+    if (!STORES[st]) return;
     const op = p.eventType === 'DELETE' ? { store: st, op: 'delete', key: STORES[st] === 'code' ? (isNaN(+o.key) ? o.key : +o.key) : o.key } : { store: st, op: 'put', value: n.value };
     try { await this.rawCommit([op]); } catch (e) { if (op.value && op.value.extKey) { const { extKey, ...v } = op.value; op.value = v; await this.rawCommit([op]); } else throw e; }
     applyOps([op]);
@@ -4958,9 +5039,12 @@ function cloudHook(repo) {
   CLOUD.rawCommit = ops => IDBRepo.prototype.commit.call(repo, ops);
   CLOUD.rawReplace = data => IDBRepo.prototype.replaceAll.call(repo, data);
   const c = repo.commit.bind(repo), r = repo.replaceAll.bind(repo), w = repo.wipe.bind(repo);
+  const pu = repo.putUser.bind(repo), du = repo.delUser.bind(repo);
   repo.commit = async ops => { await c(ops); CLOUD.push(ops); };
   repo.replaceAll = async data => { await r(data); if (CLOUD.on) CLOUD.pushAll(true).catch(() => { }); };
   repo.wipe = async stores => { await w(stores); CLOUD.deleteStores(stores); };
+  repo.putUser = async u => { await pu(u); if (CLOUD.on) await CLOUD.pushUser(u); };
+  repo.delUser = async id => { await du(id); if (CLOUD.on) await CLOUD.deleteUser(id); };
 }
 async function reloadState() {
   const d = await S.repo.loadAll();
