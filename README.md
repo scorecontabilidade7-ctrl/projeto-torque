@@ -20,15 +20,19 @@ O projeto está 100% conectado ao Supabase no projeto **Agente de IA**:
 
 ---
 
-## 👥 Acessos e Login
+## 👥 Acessos e Autenticação Segura
 
-O TORQUE aceita tanto contas cadastradas diretamente no **Supabase Auth** quanto usuários administradores do sistema:
+O TORQUE opera com dupla camada de autenticação:
+1. **Supabase Auth (Oficial em Nuvem)**: Contas gerenciadas no painel do Supabase (*Authentication › Users*).
+2. **Autenticação Local / Offline**: Usuários cadastrados no painel do sistema (*Configurações › Usuários*), com derivação de chaves via **PBKDF2-HMAC-SHA256 (100.000 iterações)** e salt criptográfico individual.
 
-| Usuário | E-mail | Senha Padrão | Tipo |
+| Usuário | E-mail | Perfil | Tipo de Acesso |
 | :--- | :--- | :--- | :--- |
-| **Arthur Frota** | `arthur@score.com.br` | `123456` | Administrador |
-| **Arthur Frota** | `arthur@torque.com` | `123456` | Administrador |
-| **Usuários Supabase Auth** | Contas do projeto *Agente de IA* | Senha cadastrada no Supabase | Usuário / Cloud |
+| **Arthur Frota** | `arthur@torque.com` | Administrador | Local + Nuvem |
+| **Amanda Gabaglia** | `amanda@torque.com` | Usuário | Local + Nuvem |
+| **Usuários Supabase Auth** | Contas cadastradas no Supabase | Definido no Supabase | Nuvem / Realtime |
+
+> 🔒 **Recomendação de Segurança:** Nunca armazene senhas em texto puro neste documento ou no repositório. Altere suas senhas imediatamente no primeiro acesso pelo menu *Configurações › Usuários*.
 
 ---
 

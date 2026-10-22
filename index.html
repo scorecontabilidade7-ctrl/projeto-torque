@@ -3085,6 +3085,7 @@ const UI = {
   fx: { ref: 'ALL', view: (() => { try { return localStorage.getItem('torque_fx_view') || 'all'; } catch (_) { return 'all'; } })(), year: 'ALL', month: 'ALL', bank: 'ALL', type: 'ALL', status: 'ALL', code: null, q: '', unc: false, sort: { k: 'date', d: -1 }, page: 1, sel: new Set() },
   dm: { year: null, month: null, open: new Set() },
   da: { year: null, open: new Set() },
+  saldos: { tab: 'geral', year: new Date().getFullYear(), month: 'ALL', bank: 'ALL', split: 50 },
   flash: new Map(), kpiEnter: false,
   cad: { tab: 'users', q: '', open: new Set(), loaded: false }
 };
@@ -3472,7 +3473,7 @@ Object.assign(ACT, {
       if (d.from === d.to) errs.push('Origem e destino devem ser contas diferentes.');
       if (!validISO(d.date)) errs.push('Data inválida.');
       if (c == null || c <= 0) errs.push('Informe um valor maior que zero.');
-      if (errs.length) return $('#tf-err', m.el).innerHTML = `<div class="err">${errs.join('<br>')}</div>`;
+      if (errs.length) return $('#tf-err', m.el).innerHTML = `<div class="err" role="alert">${errs.map(esc).join('<br>')}</div>`;
       const legs = makeTransfer({ fromBankId: d.from, toBankId: d.to, date: d.date, cents: c, desc: d.desc ? d.desc.trim() : `Transferência ${bankName(d.from)} → ${bankName(d.to)}` });
       await commitOps([...legs.map(v => ({ store: 'entries', op: 'put', value: v })), aud('TRANSFERÊNCIA', 'entry', legs[0].transferId, null, { from: d.from, to: d.to, cents: c, date: d.date })]);
       m.close(true); renderFxBody(); toast('Transferência registrada nas duas contas.');
@@ -3601,6 +3602,8 @@ function importStart() {
     const err = t => { $('#im-err', m.el).innerHTML = `<div class="err" role="alert">${esc(t)}</div>`; };
     const file = $('#im-file', m.el).files[0];
     if (!file) return err('Selecione o arquivo do extrato.');
+    const MAX_FILE_SIZE = 25 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) return err('O arquivo excede o limite máximo permitido (25 MB).');
     const fr = $('#im-from', m.el).value.trim(), tt = $('#im-to', m.el).value.trim(), from = dval($('#im-from', m.el)) || null, to = dval($('#im-to', m.el)) || null;
     if ((fr && !from) || (tt && !to)) return err('Data do período inválida. Use dd/mm/aaaa.');
     if (from && to && from > to) return err('O período inicial é posterior ao final.');
@@ -4263,12 +4266,12 @@ const CMPCH = {
       const v = s.plot[i], real = s.vals[i];
       if (v != null) dots += `<circle class="halo" cx="${x}" cy="${this.y(v)}" r="9" fill="${CMP_COL[s.id]}"/><circle cx="${x}" cy="${this.y(v)}" r="4.5" fill="${CMP_COL[s.id]}" stroke="#101014" stroke-width="2"/>`;
       const date = s.dates[i] ? (m.c.mode === 'month' ? fmtDate(s.dates[i]) : mTitle(+s.dates[i].slice(5, 7) - 1) + '/' + s.dates[i].slice(0, 4)) : '';
-      rows += `<div class="tt-r"><i style="background:${CMP_COL[s.id]}"></i><span>${s.name}${s.dates[i] ? '' : ''}<small>${date || 'Dia inexistente neste mês'}</small></span><b>${v != null ? brl(v) : (s.dates[i] ? '<em>Sem registros</em>' : '—')}</b></div>`;
+      rows += `<div class="tt-r"><i style="background:${CMP_COL[s.id]}"></i><span>${esc(s.name)}${s.dates[i] ? '' : ''}<small>${date || 'Dia inexistente neste mês'}</small></span><b>${v != null ? brl(v) : (s.dates[i] ? '<em>Sem registros</em>' : '—')}</b></div>`;
       if (m.c.cum && s.isFlow && v != null && real != null) rows += `<div class="tt-sub">no dia: ${brl(real)}</div>`;
     });
     if (vis.length === 2 && vis[0].plot[i] != null && vis[1].plot[i] != null) {
       const a = vis[0].plot[i], b = vis[1].plot[i], d = b - a, p = cmpPct(a, b);
-      rows += `<div class="tt-d"><span>Diferença (${vis[1].name} − ${vis[0].name})</span><b class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${d > 0 ? '+' : ''}${brl(d)}${p === 'NA' ? '' : p == null ? '' : ' · ' + fmtPct(p)}</b></div>`;
+      rows += `<div class="tt-d"><span>Diferença (${esc(vis[1].name)} − ${esc(vis[0].name)})</span><b class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">${d > 0 ? '+' : ''}${brl(d)}${p === 'NA' ? '' : p == null ? '' : ' · ' + fmtPct(p)}</b></div>`;
     }
     $('.cg-dots', this.svg).innerHTML = dots;
     const t = this.tip; t.innerHTML = `<div class="tt-h">${m.c.mode === 'month' ? 'Dia ' + m.labels[i] : mTitle(m.c.from - 1 + i)}<small>${esc(nm)}${m.c.cum && m.isFlow ? ' · acumulado' : ''}</small></div>${rows || '<div class="tt-r"><span>Nenhuma série visível</span></div>'}`;
@@ -4332,7 +4335,7 @@ function cmpTexts(m, host) {
   $('#cmp-title').textContent = month ? 'Evolução diária' : 'Evolução mensal';
   const bankName = c.bank === 'ALL' ? 'todas as contas' : (bankOf(c.bank) || { name: '?' }).name;
   $('#cmp-sub').textContent = `${nm}${cumOn ? ' · acumulado' : ''} · ${bankName}${c.code != null && c.ind !== 'cat' ? ' · categoria ' + c.code : ''}`;
-  $('#cmp-legend').innerHTML = m.series.map(s => `<button class="lg ${s.hidden ? 'off' : ''}" data-act="cmpLegend" data-k="${s.id}" aria-pressed="${!s.hidden}" title="Clique para ${s.hidden ? 'mostrar' : 'ocultar'}"><i style="background:${CMP_COL[s.id]}"></i>${s.name}</button>`).join('');
+  $('#cmp-legend').innerHTML = m.series.map(s => `<button class="lg ${s.hidden ? 'off' : ''}" data-act="cmpLegend" data-k="${s.id}" aria-pressed="${!s.hidden}" title="Clique para ${s.hidden ? 'mostrar' : 'ocultar'}"><i style="background:${CMP_COL[s.id]}"></i>${esc(s.name)}</button>`).join('');
   const avgL = month ? (m.isFlow ? 'Média diária' : 'Saldo médio diário') : (m.isFlow ? 'Média mensal' : 'Saldo médio mensal');
   const maxL = m.isFlow ? 'Maior movimentação' : 'Maior saldo';
   $('#cmp-chips').innerHTML = m.series.map(s => s.hidden ? '' : `<div class="chp-row"><i style="background:${CMP_COL[s.id]}"></i><span class="chp">${avgL}: <b>${s.avg == null ? '—' : brl(s.avg)}</b></span><span class="chp hot">${maxL}: <b>${s.max ? brl(s.max.v) + ' (' + (month ? s.dates[s.max.i].slice(8, 10) + '/' + s.dates[s.max.i].slice(5, 7) : mShort(+s.dates[s.max.i].slice(5, 7) - 1)) + ')' : '—'}</b></span></div>`).join('');
@@ -4345,8 +4348,8 @@ function cmpTexts(m, host) {
   if (st) host.insertAdjacentHTML('beforeend', `<div class="cmp-state"><b>${st[0]}</b><span>${st[1]}</span></div>`);
   const [A, B] = m.series, lbl = m.isFlow ? cmpTotLabel(c) : 'Saldo no fim do período';
   const diff = A.total != null && B.total != null ? B.total - A.total : null, p = cmpPct(A.total, B.total);
-  const card1 = s => `<div class="card cmp-s"><div class="l"><i style="background:${CMP_COL[s.id]}"></i>${s.name}</div><div class="v">${s.total == null ? '<span class="muted">Sem registros</span>' : brl(s.total)}</div><div class="s">${lbl}${s.count ? ` · ${s.count} ${month ? 'dia(s)' : 'mês(es)'} com dados` : ''}</div></div>`;
-  $('#cmp-sum').innerHTML = card1(A) + card1(B) + `<div class="card cmp-s var ${diff == null ? '' : diff > 0 ? 'up' : diff < 0 ? 'dn' : ''}"><div class="l">Variação (${B.name} vs ${A.name})</div><div class="v">${diff == null ? '<span class="muted">—</span>' : (diff > 0 ? '+' : '') + brl(diff)}</div><div class="s">${p == null ? 'Sem dados para comparar' : p === 'NA' ? 'Variação percentual indisponível' : fmtPct(p) + ' · ((B − A) / |A|) × 100'}</div></div>`;
+  const card1 = s => `<div class="card cmp-s"><div class="l"><i style="background:${CMP_COL[s.id]}"></i>${esc(s.name)}</div><div class="v">${s.total == null ? '<span class="muted">Sem registros</span>' : brl(s.total)}</div><div class="s">${lbl}${s.count ? ` · ${s.count} ${month ? 'dia(s)' : 'mês(es)'} com dados` : ''}</div></div>`;
+  $('#cmp-sum').innerHTML = card1(A) + card1(B) + `<div class="card cmp-s var ${diff == null ? '' : diff > 0 ? 'up' : diff < 0 ? 'dn' : ''}"><div class="l">Variação (${esc(B.name)} vs ${esc(A.name)})</div><div class="v">${diff == null ? '<span class="muted">—</span>' : (diff > 0 ? '+' : '') + brl(diff)}</div><div class="s">${p == null ? 'Sem dados para comparar' : p === 'NA' ? 'Variação percentual indisponível' : fmtPct(p) + ' · ((B − A) / |A|) × 100'}</div></div>`;
   $('#cmp-note').innerHTML = `Valores vindos dos lançamentos efetivados do Fluxo de Caixa (mesma base das DFCs). Transferências internas não entram em entradas, saídas nem resultado. <b>Linha interrompida = sem registros</b> (diferente de R$ 0,00, que é valor zerado). A suavização da curva é só visual: os pontos são os valores reais.`;
 }
 const cmpTotLabel = c => ({ ent: 'Total de entradas', sai: 'Total de saídas', res: 'Resultado do período', cat: 'Movimento da categoria' })[c.ind];
@@ -4381,6 +4384,572 @@ document.addEventListener('change', e => {
   else if (k === 'bank') c.bank = v;
   cmpChrome(); cmpRefresh();
   if (k === 'from' || k === 'to') { const f = $('[data-cmp=from]'), tt = $('[data-cmp=to]'); if (f && +f.value !== c.from) { f.value = c.from; f._sync && f._sync(); } if (tt && +tt.value !== c.to) { tt.value = c.to; tt._sync && tt._sync(); } }
+});
+
+/* =====================================================================
+   TORQUE · módulo CONTROLE DE SALDOS (Serviços e Peças)
+   - Controles simultâneos e individuais de Serviços e Peças
+   - Abas: Visão Geral, Serviços, Peças
+   - Gráfico de evolução mensal com curvas suaves (SVG), grid e tooltips
+   - Tabela analítica mês a mês e modal de drilldown
+   - Preservação estrita dos módulos, animações e integridade contábil
+   ===================================================================== */
+const KW_PECA = /pe[çc]a|pneu|oleo|óleo|filtro|bateria|amortecedor|disco|pastilha|vela|correia|produto|mercadoria|lubrificante|insumo|aditivo|suspens|escapamento|radiador|palheta/i;
+const KW_SERV = /servi[çc]|m[ãa]o de obra|mecanica|mecânica|alinhamento|balanceamento|revis[ãa]o|troca|instala[çc]|reparo|conserto|geometria|diagn[oó]stico|funilaria|pintura|ar condicionado|higieniza/i;
+
+function classifySaldosData(year, month, bankId, splitPct) {
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    m: i + 1,
+    name: MONTHS[i],
+    shortName: mShort(i),
+    servRec: 0, servCusto: 0,
+    pecaRec: 0, pecaCusto: 0,
+    totRec: 0, totCusto: 0,
+    servMargem: 0, pecaMargem: 0, totMargem: 0,
+    entries: []
+  }));
+
+  let totServRec = 0, totServCusto = 0;
+  let totPecaRec = 0, totPecaCusto = 0;
+
+  const validEntries = S.entries.filter(e => {
+    if (e.efetivado === false || e.status === 'cancelado') return false;
+    const y = +e.date.slice(0, 4), m = +e.date.slice(5, 7);
+    if (y !== +year) return false;
+    if (month !== 'ALL' && m !== +month) return false;
+    if (bankId !== 'ALL' && e.bankId !== bankId) return false;
+    if ([887, 888].includes(+e.code)) return false;
+    return true;
+  });
+
+  validEntries.forEach(e => {
+    const mIdx = +e.date.slice(5, 7) - 1;
+    const bucket = months[mIdx];
+    bucket.entries.push(e);
+
+    const c = +e.code;
+    const desc = (e.desc || '') + ' ' + (e.obs || '');
+
+    if ([421, 422, 423, 424, 4299, 431, 4399].includes(c) || (e.type === 'SAIDA' && KW_PECA.test(desc))) {
+      bucket.pecaCusto += e.cents;
+      totPecaCusto += e.cents;
+    } else if ([441, 442, 443].includes(c) || (e.type === 'SAIDA' && KW_SERV.test(desc))) {
+      bucket.servCusto += e.cents;
+      totServCusto += e.cents;
+    }
+
+    if (e.type === 'ENTRADA') {
+      const isServ = KW_SERV.test(desc);
+      const isPeca = KW_PECA.test(desc);
+
+      if (isServ && !isPeca) {
+        bucket.servRec += e.cents;
+        totServRec += e.cents;
+      } else if (isPeca && !isServ) {
+        bucket.pecaRec += e.cents;
+        totPecaRec += e.cents;
+      } else {
+        const sAmt = Math.round(e.cents * (splitPct / 100));
+        const pAmt = e.cents - sAmt;
+        bucket.servRec += sAmt;
+        bucket.pecaRec += pAmt;
+        totServRec += sAmt;
+        totPecaRec += pAmt;
+      }
+    }
+
+    bucket.totRec = bucket.servRec + bucket.pecaRec;
+    bucket.totCusto = bucket.servCusto + bucket.pecaCusto;
+    bucket.servMargem = bucket.servRec - bucket.servCusto;
+    bucket.pecaMargem = bucket.pecaRec - bucket.pecaCusto;
+    bucket.totMargem = bucket.totRec - bucket.totCusto;
+  });
+
+  const totRec = totServRec + totPecaRec;
+  const totCusto = totServCusto + totPecaCusto;
+  const totMargem = totRec - totCusto;
+  const servMargem = totServRec - totServCusto;
+  const pecaMargem = totPecaRec - totPecaCusto;
+
+  return {
+    months,
+    filteredCount: validEntries.length,
+    totServRec, totServCusto, servMargem,
+    totPecaRec, totPecaCusto, pecaMargem,
+    totRec, totCusto, totMargem,
+    servShare: totRec ? (totServRec / totRec) * 100 : 0,
+    pecaShare: totRec ? (totPecaRec / totRec) * 100 : 0,
+    margemPct: totRec ? (totMargem / totRec) * 100 : 0,
+    servMargemPct: totServRec ? (servMargem / totServRec) * 100 : 0,
+    pecaMargemPct: totPecaRec ? (pecaMargem / totPecaRec) * 100 : 0
+  };
+}
+
+function renderSaldos() {
+  const st = UI.saldos;
+  const d = classifySaldosData(st.year, st.month, st.bank, st.split);
+  const isGeral = st.tab === 'geral';
+  const isServ = st.tab === 'servicos';
+  const isPeca = st.tab === 'pecas';
+
+  let kpiCardsHtml = '';
+  if (isGeral) {
+    kpiCardsHtml = `
+      <div class="card kpi dark">
+        <div class="l">Faturamento Total Gerencial</div>
+        <div class="v">${brl(d.totRec)}</div>
+        <div class="s">${d.filteredCount} lançamento(s) no período</div>
+      </div>
+      <div class="card kpi green">
+        <div class="l">Saldo de Serviços</div>
+        <div class="v">${brl(d.totServRec)}</div>
+        <div class="s">${d.servShare.toFixed(1)}% do faturamento total</div>
+      </div>
+      <div class="card kpi red">
+        <div class="l">Saldo de Peças</div>
+        <div class="v">${brl(d.totPecaRec)}</div>
+        <div class="s">${d.pecaShare.toFixed(1)}% do faturamento total</div>
+      </div>
+      <div class="card kpi dark">
+        <div class="l">Custos Diretos (Peças + Mecânica)</div>
+        <div class="v ${d.totCusto ? 'out-c' : ''}">${brl(d.totCusto)}</div>
+        <div class="s">Peças: ${brl(d.totPecaCusto)} · Comissões: ${brl(d.totServCusto)}</div>
+      </div>
+      <div class="card kpi ${d.totMargem >= 0 ? 'green' : 'red'}">
+        <div class="l">Margem Gerencial Consolidada</div>
+        <div class="v ${d.totMargem < 0 ? 'out-c' : ''}">${brl(d.totMargem)}</div>
+        <div class="s">${d.margemPct.toFixed(1)}% de margem sobre faturamento</div>
+      </div>
+    `;
+  } else if (isServ) {
+    kpiCardsHtml = `
+      <div class="card kpi green">
+        <div class="l">Faturamento de Serviços</div>
+        <div class="v">${brl(d.totServRec)}</div>
+        <div class="s">${d.servShare.toFixed(1)}% do faturamento da oficina</div>
+      </div>
+      <div class="card kpi dark">
+        <div class="l">Custos & Comissões de Mecânica</div>
+        <div class="v ${d.totServCusto ? 'out-c' : ''}">${brl(d.totServCusto)}</div>
+        <div class="s">Comissões, troca de óleo e terceirizados</div>
+      </div>
+      <div class="card kpi ${d.servMargem >= 0 ? 'green' : 'red'}">
+        <div class="l">Margem de Contribuição (Serviços)</div>
+        <div class="v ${d.servMargem < 0 ? 'out-c' : ''}">${brl(d.servMargem)}</div>
+        <div class="s">${d.servMargemPct.toFixed(1)}% de margem líquida em serviços</div>
+      </div>
+      <div class="card kpi dark">
+        <div class="l">Participação em Serviços</div>
+        <div class="v">${d.servShare.toFixed(1)}%</div>
+        <div class="s">Relação direta Mão de Obra vs Peças</div>
+      </div>
+    `;
+  } else {
+    kpiCardsHtml = `
+      <div class="card kpi red">
+        <div class="l">Faturamento de Peças e Produtos</div>
+        <div class="v">${brl(d.totPecaRec)}</div>
+        <div class="s">${d.pecaShare.toFixed(1)}% do faturamento da oficina</div>
+      </div>
+      <div class="card kpi dark">
+        <div class="l">Custos de Aquisição (Peças/Óleos/Pneus)</div>
+        <div class="v ${d.totPecaCusto ? 'out-c' : ''}">${brl(d.totPecaCusto)}</div>
+        <div class="s">Reposição, óleos, pneus e insumos</div>
+      </div>
+      <div class="card kpi ${d.pecaMargem >= 0 ? 'green' : 'red'}">
+        <div class="l">Margem Bruta (Peças)</div>
+        <div class="v ${d.pecaMargem < 0 ? 'out-c' : ''}">${brl(d.pecaMargem)}</div>
+        <div class="s">${d.pecaMargemPct.toFixed(1)}% de margem sobre custo de peças</div>
+      </div>
+      <div class="card kpi dark">
+        <div class="l">Participação em Peças</div>
+        <div class="v">${d.pecaShare.toFixed(1)}%</div>
+        <div class="s">Representatividade no mix de faturamento</div>
+      </div>
+    `;
+  }
+
+  const activeBanks = S.banks.filter(b => b.active !== false);
+  const years = yearsAvailable();
+
+  $('#view').innerHTML = `
+    <div class="pg-head">
+      <div>
+        <h2>Controle de Saldos</h2>
+        <p>Acompanhamento gerencial integrado e individual de Serviços e Peças</p>
+      </div>
+    </div>
+
+    <!-- Navegação de Abas: Visão Geral, Serviços, Peças -->
+    <div class="vsw saldos-tabs" role="tablist" aria-label="Visualização do Controle de Saldos">
+      <button role="tab" class="${isGeral ? 'on' : ''}" data-act="saldosTab" data-tab="geral" aria-selected="${isGeral}">
+        ${ICON.trend}<span>Visão Geral</span>
+      </button>
+      <button role="tab" class="${isServ ? 'on' : ''}" data-act="saldosTab" data-tab="servicos" aria-selected="${isServ}">
+        ${ICON.gear}<span>Serviços</span>
+      </button>
+      <button role="tab" class="${isPeca ? 'on' : ''}" data-act="saldosTab" data-tab="pecas" aria-selected="${isPeca}">
+        ${ICON.wallet}<span>Peças</span>
+      </button>
+    </div>
+
+    <!-- Barra de Filtros Gerenciais -->
+    <div class="fbar card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+      <div class="fld">
+        <label for="sld-y">Ano</label>
+        <select class="in" id="sld-y">
+          ${years.map(y => `<option value="${y}" ${y === st.year ? 'selected' : ''}>${y}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld">
+        <label for="sld-m">Mês</label>
+        <select class="in" id="sld-m">
+          <option value="ALL" ${st.month === 'ALL' ? 'selected' : ''}>Ano todo (Jan a Dez)</option>
+          ${MONTHS.map((m, i) => `<option value="${i + 1}" ${st.month === String(i + 1) ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld">
+        <label for="sld-b">Conta bancária</label>
+        <select class="in" id="sld-b">
+          <option value="ALL" ${st.bank === 'ALL' ? 'selected' : ''}>Todas as contas</option>
+          ${activeBanks.map(b => `<option value="${b.id}" ${st.bank === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld">
+        <label for="sld-sp" title="Rateio atribuído a serviços nas vendas gerais sem discriminação no extrato">Rateio Vendas Gerais</label>
+        <select class="in" id="sld-sp">
+          <option value="50" ${st.split === 50 ? 'selected' : ''}>50% Serviços / 50% Peças (Padrão)</option>
+          <option value="60" ${st.split === 60 ? 'selected' : ''}>60% Serviços / 40% Peças</option>
+          <option value="70" ${st.split === 70 ? 'selected' : ''}>70% Serviços / 30% Peças</option>
+          <option value="100" ${st.split === 100 ? 'selected' : ''}>100% Serviços</option>
+          <option value="0" ${st.split === 0 ? 'selected' : ''}>100% Peças</option>
+        </select>
+      </div>
+      <span style="flex:1"></span>
+      <div class="note" style="margin:0;font-size:11.5px;padding:6px 10px;align-self:flex-end">
+        Módulo gerencial analítico: não altera lançamentos oficiais.
+      </div>
+    </div>
+
+    <!-- Cards de Indicadores (KPIs) -->
+    <div class="cards enter-cards" style="grid-template-columns:repeat(${isGeral ? 5 : 4},minmax(0,1fr))">
+      ${kpiCardsHtml}
+    </div>
+
+    <!-- Gráfico de Evolução Mensal -->
+    <div class="cmp-card" style="margin-top:16px">
+      <div class="cmp-hd">
+        <div>
+          <h3>${ICON.trend} Evolução Mensal — ${isGeral ? 'Serviços vs Peças' : isServ ? 'Serviços: Faturamento vs Custos' : 'Peças: Vendas vs Aquisição'}</h3>
+          <p>Acompanhamento comparativo mês a mês ao longo do ano de ${st.year}</p>
+        </div>
+        <div class="cmp-legend" id="saldos-legend">
+          ${isGeral ? `
+            <button class="lg" style="cursor:default"><i style="background:#16A34A"></i>Serviços</button>
+            <button class="lg" style="cursor:default"><i style="background:#FF2C2C"></i>Peças</button>
+          ` : isServ ? `
+            <button class="lg" style="cursor:default"><i style="background:#16A34A"></i>Faturamento Serviços</button>
+            <button class="lg" style="cursor:default"><i style="background:#EAB308"></i>Custos Mecânica</button>
+          ` : `
+            <button class="lg" style="cursor:default"><i style="background:#FF2C2C"></i>Vendas de Peças</button>
+            <button class="lg" style="cursor:default"><i style="background:#F97316"></i>Custos Aquisição</button>
+          `}
+        </div>
+      </div>
+      <div class="cmp-chart" id="saldos-chart-container"></div>
+    </div>
+
+    <!-- Tabela Analítica Mês a Mês -->
+    <div class="sect" style="margin-top:20px">
+      <h2>Detalhamento Mensal — ${st.year}</h2>
+      <span class="muted">Valores consolidados por mês com margens e acesso aos lançamentos</span>
+    </div>
+    <div class="tw">
+      <table class="t">
+        <thead>
+          ${isGeral ? `
+            <tr>
+              <th>Mês</th>
+              <th class="num right">Faturamento Serviços</th>
+              <th class="num right">Faturamento Peças</th>
+              <th class="num right">Total Geral</th>
+              <th class="num right">Custos Diretos</th>
+              <th class="num right">Margem Gerencial</th>
+              <th class="right" style="width:70px">Ações</th>
+            </tr>
+          ` : isServ ? `
+            <tr>
+              <th>Mês</th>
+              <th class="num right">Receita Serviços</th>
+              <th class="num right">Custos / Comissões</th>
+              <th class="num right">Margem Serviços</th>
+              <th class="num right">Margem (%)</th>
+              <th class="num right">Lançamentos</th>
+              <th class="right" style="width:70px">Ações</th>
+            </tr>
+          ` : `
+            <tr>
+              <th>Mês</th>
+              <th class="num right">Venda de Peças</th>
+              <th class="num right">Custo de Aquisição</th>
+              <th class="num right">Margem Bruta Peças</th>
+              <th class="num right">Margem (%)</th>
+              <th class="num right">Lançamentos</th>
+              <th class="right" style="width:70px">Ações</th>
+            </tr>
+          `}
+        </thead>
+        <tbody>
+          ${d.months.map(m => {
+            const hasData = m.totRec > 0 || m.totCusto > 0;
+            return `
+              <tr class="${hasData ? '' : 'zero'}">
+                <td><b>${m.name}</b></td>
+                ${isGeral ? `
+                  <td class="num right">${m.servRec ? brl(m.servRec) : '<span class="muted">—</span>'}</td>
+                  <td class="num right">${m.pecaRec ? brl(m.pecaRec) : '<span class="muted">—</span>'}</td>
+                  <td class="num right" style="font-weight:700">${m.totRec ? brl(m.totRec) : '<span class="muted">—</span>'}</td>
+                  <td class="num right ${m.totCusto ? 'out-c' : ''}">${m.totCusto ? brl(m.totCusto) : '<span class="muted">—</span>'}</td>
+                  <td class="num right" style="font-weight:700;color:${m.totMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${hasData ? brl(m.totMargem) : '<span class="muted">—</span>'}</td>
+                ` : isServ ? `
+                  <td class="num right">${m.servRec ? brl(m.servRec) : '<span class="muted">—</span>'}</td>
+                  <td class="num right ${m.servCusto ? 'out-c' : ''}">${m.servCusto ? brl(m.servCusto) : '<span class="muted">—</span>'}</td>
+                  <td class="num right" style="font-weight:700;color:${m.servMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${m.servRec ? brl(m.servMargem) : '<span class="muted">—</span>'}</td>
+                  <td class="num right">${m.servRec ? (m.servMargem / m.servRec * 100).toFixed(1) + '%' : '<span class="muted">—</span>'}</td>
+                  <td class="num right">${m.entries.length}</td>
+                ` : `
+                  <td class="num right">${m.pecaRec ? brl(m.pecaRec) : '<span class="muted">—</span>'}</td>
+                  <td class="num right ${m.pecaCusto ? 'out-c' : ''}">${m.pecaCusto ? brl(m.pecaCusto) : '<span class="muted">—</span>'}</td>
+                  <td class="num right" style="font-weight:700;color:${m.pecaMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${m.pecaRec ? brl(m.pecaMargem) : '<span class="muted">—</span>'}</td>
+                  <td class="num right">${m.pecaRec ? (m.pecaMargem / m.pecaRec * 100).toFixed(1) + '%' : '<span class="muted">—</span>'}</td>
+                  <td class="num right">${m.entries.length}</td>
+                `}
+                <td class="right" style="white-space:nowrap">
+                  <button class="icon" data-act="saldosDrill" data-m="${m.m}" aria-label="Ver lançamentos de ${m.name}" title="Ver lançamentos de ${m.name}">
+                    ${ICON.eye}
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="font-weight:800;background:#f3f4f7">
+            <td>TOTAL DO PERÍODO</td>
+            ${isGeral ? `
+              <td class="num right">${brl(d.totServRec)}</td>
+              <td class="num right">${brl(d.totPecaRec)}</td>
+              <td class="num right" style="color:var(--tx)">${brl(d.totRec)}</td>
+              <td class="num right ${d.totCusto ? 'out-c' : ''}">${brl(d.totCusto)}</td>
+              <td class="num right" style="color:${d.totMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${brl(d.totMargem)}</td>
+            ` : isServ ? `
+              <td class="num right">${brl(d.totServRec)}</td>
+              <td class="num right ${d.totServCusto ? 'out-c' : ''}">${brl(d.totServCusto)}</td>
+              <td class="num right" style="color:${d.servMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${brl(d.servMargem)}</td>
+              <td class="num right">${d.servMargemPct.toFixed(1)}%</td>
+              <td class="num right">${d.filteredCount}</td>
+            ` : `
+              <td class="num right">${brl(d.totPecaRec)}</td>
+              <td class="num right ${d.totPecaCusto ? 'out-c' : ''}">${brl(d.totPecaCusto)}</td>
+              <td class="num right" style="color:${d.pecaMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${brl(d.pecaMargem)}</td>
+              <td class="num right">${d.pecaMargemPct.toFixed(1)}%</td>
+              <td class="num right">${d.filteredCount}</td>
+            `}
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
+
+  renderSaldosChart(d, st.tab);
+
+  $('#sld-y').addEventListener('change', e => { UI.saldos.year = +e.target.value; renderSaldos(); });
+  $('#sld-m').addEventListener('change', e => { UI.saldos.month = e.target.value; renderSaldos(); });
+  $('#sld-b').addEventListener('change', e => { UI.saldos.bank = e.target.value; renderSaldos(); });
+  $('#sld-sp').addEventListener('change', e => { UI.saldos.split = +e.target.value; renderSaldos(); });
+}
+
+function renderSaldosChart(d, tab) {
+  const host = $('#saldos-chart-container');
+  if (!host) return;
+
+  const isGeral = tab === 'geral';
+  const isServ = tab === 'servicos';
+
+  const sA = d.months.map(m => isGeral ? m.servRec / 100 : isServ ? m.servRec / 100 : m.pecaRec / 100);
+  const sB = d.months.map(m => isGeral ? m.pecaRec / 100 : isServ ? m.servCusto / 100 : m.pecaCusto / 100);
+
+  const colA = isGeral ? '#16A34A' : isServ ? '#16A34A' : '#FF2C2C';
+  const colB = isGeral ? '#FF2C2C' : isServ ? '#EAB308' : '#F97316';
+  const lblA = isGeral ? 'Serviços' : isServ ? 'Receita Serviços' : 'Venda Peças';
+  const lblB = isGeral ? 'Peças' : isServ ? 'Custos Mecânica' : 'Custos Aquisição';
+
+  const maxVal = Math.max(100, ...sA, ...sB);
+  const W = Math.max(280, host.clientWidth || 800), H = 260;
+  const L = 65, R = 20, T = 20, B = 35;
+  const plotW = W - L - R, plotH = H - T - B;
+
+  const x = i => L + (i / 11) * plotW;
+  const y = v => T + plotH - (v / maxVal) * plotH;
+
+  const ptsA = sA.map((v, i) => [x(i), y(v)]);
+  const ptsB = sB.map((v, i) => [x(i), y(v)]);
+
+  const pathA = monoPath(ptsA);
+  const pathB = monoPath(ptsB);
+  const areaA = pathA ? `${pathA}L${ptsA[ptsA.length - 1][0].toFixed(1)},${H - B}L${ptsA[0][0].toFixed(1)},${H - B}Z` : '';
+  const areaB = pathB ? `${pathB}L${ptsB[ptsB.length - 1][0].toFixed(1)},${H - B}L${ptsB[0][0].toFixed(1)},${H - B}Z` : '';
+
+  let gridHtml = '';
+  const steps = 4;
+  for (let s = 0; s <= steps; s++) {
+    const val = (maxVal / steps) * s;
+    const yPos = y(val);
+    gridHtml += `<line x1="${L}" x2="${W - R}" y1="${yPos}" y2="${yPos}" class="${s === 0 ? 'zero' : ''}"/>
+                 <text x="${L - 8}" y="${yPos + 4}" text-anchor="end">R$ ${Math.round(val).toLocaleString('pt-BR')}</text>`;
+  }
+
+  const xlHtml = d.months.map((m, i) => `<text x="${x(i)}" y="${H - 10}" text-anchor="middle">${m.shortName}</text>`).join('');
+
+  host.innerHTML = `
+    <svg class="cmp-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução Mensal">
+      <defs>
+        <linearGradient id="sldGradA" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${colA}" stop-opacity=".35"/>
+          <stop offset="1" stop-color="${colA}" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="sldGradB" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="${colB}" stop-opacity=".35"/>
+          <stop offset="1" stop-color="${colB}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <g class="cg-grid">${gridHtml}</g>
+      <g class="cg-xl">${xlHtml}</g>
+      <g class="cg-s sB">
+        <path class="cg-area" fill="url(#sldGradB)" d="${areaB}"/>
+        <path class="cg-line" stroke="${colB}" d="${pathB}"/>
+      </g>
+      <g class="cg-s sA">
+        <path class="cg-area" fill="url(#sldGradA)" d="${areaA}"/>
+        <path class="cg-line" stroke="${colA}" d="${pathA}"/>
+      </g>
+      <line class="cg-guide" y1="${T}" y2="${H - B}" x1="0" x2="0"/>
+      <g class="cg-dots"></g>
+      <rect class="cg-hit" x="${L}" y="${T}" width="${plotW}" height="${plotH}" fill="transparent" style="cursor:crosshair"/>
+    </svg>
+    <div class="cmp-tip" role="status"></div>
+  `;
+
+  const tip = host.querySelector('.cmp-tip');
+  const guide = host.querySelector('.cg-guide');
+  const dots = host.querySelector('.cg-dots');
+  const hit = host.querySelector('.cg-hit');
+
+  const onHover = e => {
+    const rect = hit.getBoundingClientRect();
+    const relX = e.clientX - rect.left;
+    const idx = Math.max(0, Math.min(11, Math.round((relX / rect.width) * 11)));
+    const posX = x(idx);
+    guide.setAttribute('x1', posX);
+    guide.setAttribute('x2', posX);
+    guide.style.opacity = '1';
+
+    const vA = sA[idx] * 100;
+    const vB = sB[idx] * 100;
+    const yA = y(sA[idx]);
+    const yB = y(sB[idx]);
+
+    dots.innerHTML = `
+      <circle class="halo" cx="${posX}" cy="${yA}" r="8" fill="${colA}"/>
+      <circle cx="${posX}" cy="${yA}" r="4" fill="${colA}" stroke="#101014" stroke-width="2"/>
+      <circle class="halo" cx="${posX}" cy="${yB}" r="8" fill="${colB}"/>
+      <circle cx="${posX}" cy="${yB}" r="4" fill="${colB}" stroke="#101014" stroke-width="2"/>
+    `;
+
+    tip.innerHTML = `
+      <div class="tt-h">${d.months[idx].name} / ${UI.saldos.year}</div>
+      <div class="tt-r"><i style="background:${colA}"></i><span>${lblA}</span><b>${brl(vA)}</b></div>
+      <div class="tt-r"><i style="background:${colB}"></i><span>${lblB}</span><b>${brl(vB)}</b></div>
+      <div class="tt-d">
+        <span>${isGeral ? 'Total Faturamento' : 'Margem'}</span>
+        <b>${brl(isGeral ? vA + vB : vA - vB)}</b>
+      </div>
+    `;
+    tip.classList.add('on');
+
+    let tipLeft = (posX / W) * host.clientWidth + 12;
+    if (tipLeft + 200 > host.clientWidth) tipLeft = (posX / W) * host.clientWidth - 210;
+    tip.style.left = Math.max(4, tipLeft) + 'px';
+    tip.style.top = Math.max(10, Math.min(yA, yB) - 20) + 'px';
+  };
+
+  const onLeave = () => {
+    guide.style.opacity = '0';
+    dots.innerHTML = '';
+    tip.classList.remove('on');
+  };
+
+  hit.addEventListener('pointermove', onHover);
+  hit.addEventListener('pointerdown', onHover);
+  hit.addEventListener('pointerleave', onLeave);
+}
+
+function saldosDrill(month) {
+  const m = +month;
+  const st = UI.saldos;
+  const d = classifySaldosData(st.year, m, st.bank, st.split);
+  const bucket = d.months[m - 1];
+
+  openModal({
+    title: `Lançamentos de ${MONTHS[m - 1]} / ${st.year}`,
+    body: `
+      <div class="note" style="margin-bottom:12px">
+        Total de lançamentos no mês: <b>${bucket.entries.length}</b> · Faturamento Serviços: <b>${brl(bucket.servRec)}</b> · Peças: <b>${brl(bucket.pecaRec)}</b>
+      </div>
+      <div class="tw" style="max-height:50vh;overflow-y:auto">
+        <table class="t">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Descrição</th>
+              <th>Conta bancária</th>
+              <th>Categoria</th>
+              <th>Tipo</th>
+              <th class="num right">Valor</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${bucket.entries.map(e => {
+              const b = bankOf(e.bankId) || { name: '—' };
+              const a = accOf(e.code) || { name: 'Sem classificação' };
+              return `
+                <tr>
+                  <td class="num">${fmtDate(e.date)}</td>
+                  <td><b>${esc(e.desc || '—')}</b>${e.obs ? '<br><small class="muted">' + esc(e.obs) + '</small>' : ''}</td>
+                  <td>${esc(b.name)}</td>
+                  <td><span class="mono muted">${e.code || '—'}</span> ${esc(a.name)}</td>
+                  <td>${e.type === 'ENTRADA' ? '<span class="chip ok">Entrada</span>' : '<span class="chip gray">Saída</span>'}</td>
+                  <td class="num right" style="font-weight:700;color:${e.type === 'ENTRADA' ? 'var(--ok)' : 'var(--tx)'}">${brl(e.cents)}</td>
+                </tr>
+              `;
+            }).join('') || '<tr><td colspan="6" class="empty">Nenhum lançamento encontrado neste período.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `,
+    foot: `<button class="btn pri" data-mclose>Fechar</button>`
+  });
+}
+
+Object.assign(ACT, {
+  saldosTab(el) {
+    UI.saldos.tab = el.dataset.tab;
+    renderSaldos();
+  },
+  saldosDrill(el) {
+    saldosDrill(el.dataset.m);
+  }
 });
 
 'use strict';
@@ -4480,7 +5049,7 @@ Object.assign(ACT, {
       if (!/^\d{1,6}$/.test(d.code.trim()) || !code) err.push('Código inválido (use de 1 a 6 dígitos).');
       if (S.accounts.some(a => a.code === code)) err.push('Já existe uma conta com este código.');
       if (!d.name.trim()) err.push('Informe a descrição.');
-      if (err.length) return $('#an-err', m.el).innerHTML = `<div class="err">${err.join('<br>')}</div>`;
+      if (err.length) return $('#an-err', m.el).innerHTML = `<div class="err" role="alert">${err.map(esc).join('<br>')}</div>`;
       const ref = S.accounts.filter(a => a.cat === d.cat), last = Math.max(...ref.map(a => a.order));
       const acc = { code, name: d.name.trim(), cat: d.cat, group: ref[0].group, nature: ref[0].nature, dfcKey: ref[0].dfcKey, order: last + 0.5, active: true, custom: true };
       await commitOps([{ store: 'accounts', op: 'put', value: acc }, aud('NOVA CONTA', 'account', String(code), null, acc)]);
@@ -4520,7 +5089,7 @@ function bankForm(id) {
     if (cents == null) err.push('Saldo inicial inválido.');
     if (!validISO(d.openingDate)) err.push('Data de abertura inválida.');
     if (S.banks.some(b => b.id !== id && fold(b.name) === fold(d.name.trim()))) err.push('Já existe uma conta com este nome.');
-    if (err.length) return $('#bf-err', m.el).innerHTML = `<div class="err">${err.join('<br>')}</div>`;
+    if (err.length) return $('#bf-err', m.el).innerHTML = `<div class="err" role="alert">${err.map(esc).join('<br>')}</div>`;
     const nb = { id: b0 ? b0.id : uid(), bank: d.bank.trim(), name: d.name.trim(), agency: d.agency.trim(), number: d.number.trim(), internalId: d.internalId.trim(), openingCents: cents, openingDate: d.openingDate, active: !!d.active };
     await commitOps([{ store: 'banks', op: 'put', value: nb }, aud(b0 ? 'EDIÇÃO DE CONTA BANCÁRIA' : 'NOVA CONTA BANCÁRIA', 'bank', nb.id, b0, nb)]);
     m.close(true); renderCad(); toast('Conta bancária salva.');
@@ -4540,16 +5109,33 @@ Object.assign(ACT, {
 'use strict';
 /* =====================================================================
    TORQUE · acesso (login, sessão, usuários) — mesmo padrão do Zuno
-   - Usuários ficam no IndexedDB (store "users"), senha com hash SHA-256 + salt.
-   - >>> VALIDAÇÃO REAL DO USUÁRIO: bloco marcado em authSubmit(). Para API/banco,
-     troque-o por uma chamada de autenticação que devolva o usuário. <<<
+   - Usuários ficam no IndexedDB (store "users"), com chaves derivadas por PBKDF2-HMAC-SHA256 (100.000 iterações) e salt criptográfico individual.
+   - Compatibilidade automática com migração transparente de hashes legados SHA-256 no primeiro login.
+   - Proteção progressiva contra ataques de força bruta (rate limiting e backoff exponencial).
    ===================================================================== */
 const SESSION_KEY = 'torque_session_v1';
-const DEFAULT_ADMIN = { name: 'Arthur Frota', email: 'arthur@torque.com', pass: '123456' };
 const normU = v => String(v || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
+/* ---------------- Criptografia e Derivação de Chaves (PBKDF2 100k + SHA-256) */
 async function hashPassword(pw, salt) {
+  if (window.crypto && crypto.subtle) {
+    try {
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
+      const bits = await crypto.subtle.deriveBits({
+        name: 'PBKDF2',
+        salt: enc.encode(salt),
+        iterations: 100000,
+        hash: 'SHA-256'
+      }, keyMaterial, 256);
+      return 'pbkdf2:100000:' + [...new Uint8Array(bits)].map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (_) { }
+  }
+  return hashPasswordLegacy(pw, salt);
+}
+
+async function hashPasswordLegacy(pw, salt) {
   const data = new TextEncoder().encode(salt + ':' + pw);
   try {
     if (window.crypto && crypto.subtle) {
@@ -4558,6 +5144,89 @@ async function hashPassword(pw, salt) {
     }
   } catch (_) { }
   let h = 5381; for (const b of data) h = ((h << 5) + h + b) >>> 0; return 'x' + h.toString(16);
+}
+
+async function verifyPassword(pw, salt, storedHash) {
+  if (!storedHash) return false;
+  if (storedHash.startsWith('pbkdf2:100000:')) {
+    const computed = await hashPassword(pw, salt);
+    return computed === storedHash;
+  }
+  const legacyComputed = await hashPasswordLegacy(pw, salt);
+  return legacyComputed === storedHash;
+}
+
+/* ---------------- Proteção contra Força Bruta (Rate Limiting e Backoff) */
+const LOGIN_RATE_LIMITER = {
+  FAIL_KEY: 'torque_auth_fails',
+  LOCKOUT_TIERS: [
+    { attempts: 3, delayMs: 2000 },
+    { attempts: 5, delayMs: 10000 },
+    { attempts: 8, delayMs: 30000 }
+  ],
+  getState() {
+    try {
+      const data = JSON.parse(sessionStorage.getItem(this.FAIL_KEY) || '{}');
+      return { count: data.count || 0, lockUntil: data.lockUntil || 0 };
+    } catch (_) { return { count: 0, lockUntil: 0 }; }
+  },
+  recordFail() {
+    const st = this.getState();
+    const count = st.count + 1;
+    let lockUntil = 0;
+    for (const tier of this.LOCKOUT_TIERS) {
+      if (count >= tier.attempts) lockUntil = Date.now() + tier.delayMs;
+    }
+    try { sessionStorage.setItem(this.FAIL_KEY, JSON.stringify({ count, lockUntil })); } catch (_) { }
+    return { count, lockUntil };
+  },
+  reset() {
+    try { sessionStorage.removeItem(this.FAIL_KEY); } catch (_) { }
+  },
+  isLocked() {
+    const st = this.getState();
+    if (st.lockUntil && Date.now() < st.lockUntil) {
+      return Math.ceil((st.lockUntil - Date.now()) / 1000);
+    }
+    return 0;
+  }
+};
+
+/* ---------------- Gerenciamento de Sessão Estruturada */
+function createSession(userId) {
+  const sess = {
+    userId,
+    token: uid(),
+    createdAt: Date.now(),
+    exp: Date.now() + 30 * 24 * 60 * 60 * 1000
+  };
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(sess)); } catch (_) { }
+  S.me = userId;
+}
+
+function resolveSessionUser() {
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+  let sid = raw;
+  if (raw.startsWith('{')) {
+    try {
+      const sess = JSON.parse(raw);
+      if (sess.exp && Date.now() > sess.exp) {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+      sid = sess.userId;
+    } catch (_) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+  }
+  const u = S.users.find(x => x.id === sid && x.status !== 'inactive');
+  if (!u) {
+    try { localStorage.removeItem(SESSION_KEY); } catch (_) { }
+    return null;
+  }
+  return u;
 }
 const firstName = u => (u && u.name ? u.name.trim().split(/\s+/)[0] : '');
 const initials = u => (u && u.name ? u.name.trim().split(/\s+/).slice(0, 2).map(x => x[0]).join('').toUpperCase() : '?');
@@ -4678,6 +5347,8 @@ function hideAuth() { $('#authScreen').classList.remove('show'); }
 
 async function authSubmit(ev) {
   ev.preventDefault();
+  const waitSec = LOGIN_RATE_LIMITER.isLocked();
+  if (waitSec > 0) return authFail(`Muitas tentativas incorretas. Aguarde ${waitSec}s antes de tentar novamente.`);
   const email = $('#authEmail').value.trim(), pass = $('#authPass').value;
   if (!email || !pass) return authFail(email ? 'Informe sua senha para entrar.' : 'Preencha usuário e senha para entrar.');
   /* nuvem: com o Supabase configurado, o login oficial é o e-mail/senha cadastrados lá; se a nuvem falhar, vale o cadastro local (modo offline) */
@@ -4688,12 +5359,18 @@ async function authSubmit(ev) {
       const cu = await CLOUD.signIn(email, pass), id = 'sb-' + cu.id;
       let mu = S.users.find(x => x.id === id);
       if (!mu) { const nm = (cu.user_metadata && cu.user_metadata.name) || email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); mu = { id, name: nm, email, role: 'Usuário', status: 'active', createdAt: new Date().toISOString(), cloud: true }; await S.repo.putUser(mu); S.users.push(mu); }
-      try { localStorage.setItem(SESSION_KEY, id); } catch (_) { }
-      S.me = id;
+      createSession(id);
+      LOGIN_RATE_LIMITER.reset();
       b0.className = 'btn pri zl-ok'; b0.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg> Acesso liberado';
       $('.zuno-login-card').classList.add('zl-success');
       await new Promise(r => setTimeout(r, 450)); await torqueLoginAnimation(); enterApp(true); return;
-    } catch (e) { cloudBad = !e.net; b0.disabled = false; b0.className = 'btn pri'; b0.textContent = 'Entrar'; }
+    } catch (e) {
+      cloudBad = !e.net;
+      b0.disabled = false;
+      b0.className = 'btn pri';
+      b0.textContent = 'Entrar';
+      if (cloudBad) LOGIN_RATE_LIMITER.recordFail();
+    }
   }
   /* >>> VALIDAÇÃO DO USUÁRIO (sincronizado com Supabase) <<< */
   const key = normU(email);
@@ -4702,15 +5379,35 @@ async function authSubmit(ev) {
     try { await CLOUD.syncUsers(); } catch (_) { }
     matches = S.users.filter(x => x.passwordHash && [x.email, (x.email || '').split('@')[0], x.name, (x.name || '').split(' ')[0]].some(v => v && normU(v) === key));
   }
-  if (!matches.length) return authFail(cloudBad ? 'Senha incorreta. Verifique seus dados e tente novamente.' : 'Usuário não possui cadastro. Verifique seus dados ou solicite acesso ao administrador.');
+  if (!matches.length) {
+    LOGIN_RATE_LIMITER.recordFail();
+    return authFail(cloudBad ? 'Senha incorreta. Verifique seus dados e tente novamente.' : 'Usuário não possui cadastro. Verifique seus dados ou solicite acesso ao administrador.');
+  }
   const active = matches.filter(x => x.status !== 'inactive');
   if (!active.length) return authFail('Este usuário está desativado. Solicite acesso ao administrador.');
   const btn = $('#authBtn'); btn.disabled = true; btn.className = 'btn pri zl-loading'; btn.innerHTML = '<span class="zl-spin"></span> Entrando…';
   let u = null;
-  for (const c of active) if ((await hashPassword(pass, c.salt)) === c.passwordHash) { u = c; break; }
-  if (!u) return authFail('Senha incorreta. Verifique seus dados e tente novamente.');
-  try { localStorage.setItem(SESSION_KEY, u.id); } catch (_) { }
-  S.me = u.id;
+  for (const c of active) {
+    if (await verifyPassword(pass, c.salt, c.passwordHash)) {
+      u = c;
+      if (!u.passwordHash.startsWith('pbkdf2:')) {
+        try {
+          u.passwordHash = await hashPassword(pass, u.salt);
+          u.updatedAt = new Date().toISOString();
+          await S.repo.putUser(u);
+        } catch (_) { }
+      }
+      break;
+    }
+  }
+  if (!u) {
+    const { lockUntil } = LOGIN_RATE_LIMITER.recordFail();
+    const sec = lockUntil && Date.now() < lockUntil ? Math.ceil((lockUntil - Date.now()) / 1000) : 0;
+    const lockMsg = sec ? ` Aguarde ${sec}s para nova tentativa.` : '';
+    return authFail('Senha incorreta. Verifique seus dados e tente novamente.' + lockMsg);
+  }
+  LOGIN_RATE_LIMITER.reset();
+  createSession(u.id);
   btn.className = 'btn pri zl-ok'; btn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg> Acesso liberado';
   $('.zuno-login-card').classList.add('zl-success');
   await new Promise(r => setTimeout(r, 450));
@@ -4819,7 +5516,8 @@ const DEFAULT_CLOUD_CFG = {
   projectName: 'Agente de IA'
 };
 
-const CLOUD_SQL = `-- Rode UMA vez no Supabase: SQL Editor > New query > cole tudo > Run
+const CLOUD_SQL = `-- TORQUE · SCRIPT SQL DE HARDENING E SEGURANÇA (Supabase)
+-- Execute no Supabase: SQL Editor > New query > cole tudo > Run
 create table if not exists public.torque_docs (
   store      text        not null,
   key        text        not null,
@@ -4829,14 +5527,53 @@ create table if not exists public.torque_docs (
   primary key (store, key)
 );
 alter table public.torque_docs enable row level security;
+
+-- Limpeza de políticas legadas
 drop policy if exists torque_auth_all on public.torque_docs;
-create policy torque_auth_all on public.torque_docs
-  for all to authenticated using (true) with check (true);
 drop policy if exists torque_anon_all on public.torque_docs;
-create policy torque_anon_all on public.torque_docs
-  for all to anon using (true) with check (true);
+drop policy if exists torque_auth_select on public.torque_docs;
+drop policy if exists torque_auth_insert on public.torque_docs;
+drop policy if exists torque_auth_update on public.torque_docs;
+drop policy if exists torque_auth_delete on public.torque_docs;
+drop policy if exists torque_anon_select on public.torque_docs;
+drop policy if exists torque_anon_insert on public.torque_docs;
+drop policy if exists torque_anon_update on public.torque_docs;
+drop policy if exists torque_anon_delete on public.torque_docs;
+
+-- 1. Usuários autenticados (Supabase Auth): acesso a dados operacionais com log de auditoria imutável
+create policy torque_auth_select on public.torque_docs
+  for select to authenticated using (true);
+
+create policy torque_auth_insert on public.torque_docs
+  for insert to authenticated with check (true);
+
+create policy torque_auth_update on public.torque_docs
+  for update to authenticated using (store <> 'audit') with check (store <> 'audit');
+
+create policy torque_auth_delete on public.torque_docs
+  for delete to authenticated using (store <> 'audit');
+
+-- 2. Acesso Anon restrito: protege credenciais ('users') e registros de auditoria ('audit') contra exfiltração
+create policy torque_anon_select on public.torque_docs
+  for select to anon using (store not in ('users', 'audit'));
+
+create policy torque_anon_insert on public.torque_docs
+  for insert to anon with check (store not in ('users', 'audit'));
+
+create policy torque_anon_update on public.torque_docs
+  for update to anon using (store not in ('users', 'audit')) with check (store not in ('users', 'audit'));
+
+create policy torque_anon_delete on public.torque_docs
+  for delete to anon using (store not in ('users', 'audit'));
+
+-- 3. Tempo Real (Realtime)
 alter table public.torque_docs replica identity full;
-alter publication supabase_realtime add table public.torque_docs;`;
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'torque_docs') then
+    alter publication supabase_realtime add table public.torque_docs;
+  end if;
+end $$;`;
 
 const CLOUD = {
   CFG: 'torque_cloud_cfg', OUT: 'torque_cloud_outbox', LINK: 'torque_cloud_linked',
@@ -5513,10 +6250,11 @@ async function runSelfTests() {
    ===================================================================== */
 const ROUTES = {
   'fluxo': { title: 'Fluxo de Caixa', sub: 'Lançamentos, saldos e conciliação bancária', render: () => renderFluxo() },
-  'comparativo': { title: 'Comparativo', sub: 'Evolução financeira e comparação entre períodos', render: () => renderCmp() },
-  'config': { title: 'Configurações', sub: 'Usuários, contas bancárias e categorias', render: () => renderCad() },
   'dfc-mes': { title: 'DFC Mês', sub: 'Demonstração dos fluxos de caixa mensal', render: () => renderDfcMes() },
-  'dfc-ano': { title: 'DFC Ano', sub: 'Consolidado anual mês a mês', render: () => renderDfcAno() }
+  'dfc-ano': { title: 'DFC Ano', sub: 'Consolidado anual mês a mês', render: () => renderDfcAno() },
+  'comparativo': { title: 'Comparativo', sub: 'Evolução financeira e comparação entre períodos', render: () => renderCmp() },
+  'saldos': { title: 'Controle de Saldos', sub: 'Gestão gerencial e simultânea de serviços e peças', render: () => renderSaldos() },
+  'config': { title: 'Configurações', sub: 'Usuários, contas bancárias e categorias', render: () => renderCad() }
 };
 function moveNavInd() {
   const on = $('.nav button.on'), ind = $('#navInd'); if (!on || !ind) return;
@@ -5563,6 +6301,7 @@ async function boot() {
       <button data-act="nav" data-r="dfc-mes" data-tip="DFC Mês">${ICON.month}<span>DFC Mês</span></button>
       <button data-act="nav" data-r="dfc-ano" data-tip="DFC Ano">${ICON.year}<span>DFC Ano</span></button>
       <button data-act="nav" data-r="comparativo" data-tip="Comparativo">${ICON.trend}<span>Comparativo</span></button>
+      <button data-act="nav" data-r="saldos" data-tip="Controle de Saldos">${ICON.scale}<span>Controle de Saldos</span></button>
       <button data-act="nav" data-r="config" data-tip="Configurações">${ICON.gear}<span>Configurações</span></button>
     </nav>
     <div class="side-foot"><button data-act="sysOpen" data-tip="Dados, backup e testes">${ICON.db}<span>Dados, backup e testes</span></button><button data-act="logout" class="out" data-tip="Sair do TORQUE">${ICON.logout}<span>Sair do TORQUE</span></button></div>
@@ -5595,12 +6334,7 @@ async function boot() {
     await loadUsers();
     await CLOUD.init(); cloudPill();
     try {
-      const sid = localStorage.getItem(SESSION_KEY);
-      let u = S.users.find(x => x.id === sid && x.status !== 'inactive');
-      if (!u && sid) {
-        u = S.users.find(x => normU(x.email) === 'arthur@torque.com');
-        if (u) { try { localStorage.setItem(SESSION_KEY, u.id); } catch (_) { } }
-      }
+      const u = resolveSessionUser();
       S.me = u ? u.id : null;
       if (u && String(u.id).startsWith('sb-') && !(CLOUD.on && CLOUD.session)) S.me = null;
     } catch (_) { S.me = null; }
