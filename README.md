@@ -1,9 +1,25 @@
 # TORQUE — Gestão Financeira e Conciliação Bancária
 
-Sistema financeiro completo (Fluxo de Caixa, DFC, Plano de Contas, Conciliação Bancária, Auditoria) conectado em nuvem com o **Supabase** (Projeto: *Agente de IA*).
+Sistema financeiro completo (Fluxo de Caixa, DFC, Plano de Contas, Conciliação Bancária, Auditoria, **Controle de Saldos** com planilha interativa e **Modo Escuro / Claro**) conectado em nuvem com o **Supabase** (Projeto: *Agente de IA*).
 
 - 🌐 **Aplicação no Ar (Produção)**: [https://projeto-torque.vercel.app](https://projeto-torque.vercel.app)
 - 🐙 **Repositório GitHub**: [https://github.com/scorecontabilidade7-ctrl/projeto-torque](https://github.com/scorecontabilidade7-ctrl/projeto-torque)
+
+---
+
+## 🛠️ Principais Módulos do Sistema
+
+1. **Fluxo de Caixa**: Lançamentos financeiros, conciliação bancária, importação de extratos (OFX, XLSX, CSV) e filtros avançados.
+2. **Controle de Saldos (Planilha Digital Interativa)**:
+   - Gestão gerencial independente e detalhada de Entradas, Saídas, Serviços e Peças.
+   - Cálculo automático de Saldos de Serviços, Peças, Geral e Resultado Gerencial Consolidado.
+   - Seletor nativo de Bancos (Banco do Brasil, Caixa, Itaú, Bradesco, Santander, Inter, Nubank, Sicoob, Sicredi, Dinheiro e opção OUTRO customizável).
+   - Abas dedicadas: *Visão Geral*, *Serviços* e *Peças*.
+   - Exportação instantânea para Excel (`.xlsx`) e configuração de saldos iniciais.
+3. **DFC (Mês e Ano)**: Demonstração dos Fluxos de Caixa estruturada pelo plano de contas com totalizadores e fechamento.
+4. **Comparativo**: Evolução gráfica mensal e diária com visualização de séries temporais e médias.
+5. **Tema Escuro & Claro**: Alternância dinâmica no cabeçalho, com suporte a alto contraste e persistência local.
+
 
 ---
 
