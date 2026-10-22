@@ -1795,7 +1795,8 @@ const PLAN = {
 "banks": [
 {
 "name": "CAIXA",
-"opening": 24856
+"opening": 17015,
+"openingDate": "2026-09-01"
 },
 {
 "name": "BB",
@@ -2451,7 +2452,7 @@ function seedFromPlan(plan) {
   const open = '2026-06-01';
   const banks = plan.banks.map((b, i) => ({
     id: bankSlug(b.name), bank: b.name, name: b.name, agency: '', number: '', internalId: 'C' + (i + 1),
-    openingCents: b.opening, openingDate: open, active: true
+    openingCents: b.opening, openingDate: b.openingDate || open, active: true
   }));
   return { accounts, banks };
 }
@@ -3359,14 +3360,10 @@ async function deleteEntries(ids) {
   S.entries.forEach(e => { if (all.has(e.id) && e.transferId) S.entries.filter(x => x.transferId === e.transferId).forEach(x => all.add(x.id)); });
   const ops = [];
   all.forEach(id => { const e = S.entries.find(x => x.id === id); if (e) { ops.push({ store: 'entries', op: 'delete', key: id }); ops.push(aud('EXCLUSÃO', 'entry', id, e, null)); } });
-  /* o "Banco informou" digitado antes já incluía os lançamentos apagados: limpa os saldos informados afetados */
-  const minDate = {}; all.forEach(id => { const e = S.entries.find(x => x.id === id); if (e && (!minDate[e.bankId] || e.date < minDate[e.bankId])) minDate[e.bankId] = e.date; });
-  const stale = S.recons.filter(r => minDate[r.bankId] && r.date >= minDate[r.bankId]);
-  stale.forEach(r => { ops.push({ store: 'recons', op: 'delete', key: r.id }); ops.push(aud('SALDO BANCÁRIO LIMPO', 'recon', r.id, r, null)); });
   await commitOps(ops); ids.forEach(i => UI.fx.sel.delete(i)); all.forEach(i => UI.fx.sel.delete(i));
   const trs = [...all].slice(0, 30).map(i => $(`tr[data-eid="${i}"]`)).filter(Boolean);
   if (trs.length && !REDUCED()) { trs.forEach(t => t.classList.add('row-out')); await new Promise(r => setTimeout(r, 230)); }
-  renderFxBody(); toast(`${all.size} lançamento(s) excluído(s). Saldos recalculados${stale.length ? ' e ' + stale.length + ' saldo(s) informado(s) pelo banco limpo(s): informe novamente para conferir' : ''}.`, stale.length ? 'warn' : 'ok');
+  renderFxBody(); toast(`${all.size} lançamento(s) excluído(s). Saldos recalculados.`);
 }
 
 /* ----------------------------------------------------- formulário de lançamento */
@@ -3487,10 +3484,16 @@ Object.assign(ACT, {
 Object.assign(ACT, {
   reconNew(el) {
     const { to } = fxRange();
+    const curBankId = (el && el.dataset && el.dataset.id) || (S.banks.length ? S.banks[0].id : '');
+    const bankEntries = S.entries.filter(e => e.bankId === curBankId);
+    const lastDate = bankEntries.length ? bankEntries.map(e => e.date).sort().pop() : null;
+    const defDate = to || lastDate || todayISO();
+    const curRec = latestRecon(S.recons, curBankId, defDate);
+    const prevVal = curRec ? 'R$ ' + numBR(curRec.informedCents) : '';
     const m = openModal({
       title: 'Informar saldo final do banco',
-      body: `<form class="grid" id="rc"><div class="fld"><label for="rc-b">Conta</label><select class="in" id="rc-b" name="bankId">${S.banks.map(b => `<option value="${b.id}" ${b.id === (el && el.dataset.id) ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
-      <div class="grid g2"><div class="fld"><label for="rc-d">Data do saldo</label>${dtInput({ id: 'rc-d', name: 'date', iso: to && to < todayISO() ? to : todayISO() })}</div><div class="fld"><label for="rc-v">Saldo no extrato (R$)</label><input class="in" id="rc-v" name="value" data-money="neg" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00"></div></div>
+      body: `<form class="grid" id="rc"><div class="fld"><label for="rc-b">Conta</label><select class="in" id="rc-b" name="bankId">${S.banks.map(b => `<option value="${b.id}" ${b.id === curBankId ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>
+      <div class="grid g2"><div class="fld"><label for="rc-d">Data do saldo</label>${dtInput({ id: 'rc-d', name: 'date', iso: defDate })}</div><div class="fld"><label for="rc-v">Saldo no extrato (R$)</label><input class="in" id="rc-v" name="value" data-money="neg" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" value="${prevVal}"></div></div>
       <div id="rc-prev" class="note"></div><div id="rc-err"></div></form>`,
       foot: `<button class="btn" data-mclose>Cancelar</button><button class="btn pri" id="rc-ok">Registrar</button>`
     });
@@ -3501,15 +3504,18 @@ Object.assign(ACT, {
       $('#rc-prev', m.el).innerHTML = `Saldo calculado pelo TORQUE em ${fmtDate(d.date)}: <b>${brl(calc)}</b>${c != null ? ` · diferença: <b class="${calc - c ? 'out-c' : 'in-c'}">${brl(calc - c)}</b> ${calc - c === 0 ? '(conciliado)' : '(divergente)'}` : ''}`;
     };
     $('#rc', m.el).addEventListener('input', prev); prev();
-    $('#rc-ok', m.el).addEventListener('click', async () => {
+    const doSubmit = async () => {
       const d = formData($('#rc', m.el)), c = parseMoney(d.value);
       if (!validISO(d.date) || c == null) return $('#rc-err', m.el).innerHTML = '<div class="err">Informe uma data válida e o saldo do extrato.</div>';
       const rec = { id: uid(), bankId: d.bankId, date: d.date, informedCents: c, at: new Date().toISOString(), origin: 'manual' };
       await commitOps([{ store: 'recons', op: 'put', value: rec }, aud('SALDO BANCÁRIO', 'recon', rec.id, null, rec)]);
+      if (CLOUD.on) { try { await CLOUD.flush(); } catch (_) { } }
       m.close(true); renderFxBody();
       const r = reconStatus(bankOf(d.bankId), S.entries, rec);
       toast(r.status === 'CONCILIADO' ? 'Conta conciliada: diferença R$ 0,00.' : `Divergência de ${brl(r.diff)} nesta conta. Use “Investigar”.`, r.status === 'CONCILIADO' ? 'ok' : 'warn');
-    });
+    };
+    $('#rc', m.el).addEventListener('submit', e => { e.preventDefault(); doSubmit(); });
+    $('#rc-ok', m.el).addEventListener('click', doSubmit);
   },
   async reconMark(el) {
     const b = bankOf(el.dataset.id), rec = latestRecon(S.recons, b.id, fxRange().to);
@@ -4494,7 +4500,7 @@ function renderBancos() {
   $('#cad-body').innerHTML = `<div class="toolbar"><span class="muted" style="flex:1">Cada lançamento fica vinculado a uma destas contas. O saldo inicial vale a partir da data de abertura do controle.</span><button class="btn pri" data-act="bankNew">${ICON.plus} Nova conta bancária</button></div>
   <div class="tw" style="margin-top:12px"><table class="t"><thead><tr><th>Banco</th><th>Nome da conta</th><th>Agência</th><th>Número</th><th>Identificação</th><th class="right">Saldo inicial</th><th>Abertura do controle</th><th>Situação</th><th>Lançamentos</th><th></th></tr></thead><tbody>
   ${S.banks.map(b => { const n = S.entries.filter(e => e.bankId === b.id).length; return `<tr class="${b.active === false ? 'off' : ''}"><td>${esc(b.bank)}</td><td><b>${esc(b.name)}</b></td><td>${esc(b.agency || '—')}</td><td>${esc(b.number || '—')}</td><td class="mono">${esc(b.internalId || '')}</td><td class="num right">${brl(b.openingCents)}</td><td class="num">${fmtDate(b.openingDate)}</td><td>${b.active === false ? '<span class="chip gray">Inativa</span>' : '<span class="chip ok">Ativa</span>'}</td><td class="num">${n}</td><td style="white-space:nowrap"><button class="icon" data-act="bankEdit" data-id="${b.id}" aria-label="Editar conta ${esc(b.name)}">${ICON.edit}</button><button class="icon d" data-act="bankDel" data-id="${b.id}" aria-label="Excluir">${ICON.trash}</button></td></tr>`; }).join('') || '<tr><td colspan="10" class="empty">Nenhuma conta cadastrada.</td></tr>'}</tbody></table></div>
-  <div class="note" style="margin-top:12px">Contas CAIXA, BB, ITÁU, INTER e DINHEIRO vieram da aba FLUXO DE CAIXA da planilha, com o saldo inicial de lá (CAIXA = R$ 248,56). A data de abertura <b>01/06/2026</b> é a data do primeiro lançamento da planilha — confira e ajuste se necessário.</div>`;
+  <div class="note" style="margin-top:12px">Contas CAIXA, BB, ITÁU, INTER e DINHEIRO vieram da aba FLUXO DE CAIXA da planilha, com o saldo inicial correto (CAIXA = R$ 170,15 em 01/09/2026). Abertura e saldos sincronizados com segurança.</div>`;
 }
 function bankForm(id) {
   const b0 = id ? bankOf(id) : null, n = b0 ? S.entries.filter(e => e.bankId === id).length : 0;
@@ -4558,21 +4564,61 @@ const initials = u => (u && u.name ? u.name.trim().split(/\s+/).slice(0, 2).map(
 const meUser = () => S.users.find(u => u.id === S.me) || null;
 
 async function loadUsers() {
-  S.users = await S.repo.allUsers();
-  if (!S.users.length) {   /* primeiro acesso: administrador inicial */
-    const salt = uid();
-    const u = { id: uid(), name: DEFAULT_ADMIN.name, email: DEFAULT_ADMIN.email, role: 'Administrador', status: 'active', salt, passwordHash: await hashPassword(DEFAULT_ADMIN.pass, salt), createdAt: new Date().toISOString() };
-    await S.repo.putUser(u);
-    const salt2 = uid();
-    const u2 = { id: uid(), name: 'Arthur Frota', email: 'arthur@score.com.br', role: 'Administrador', status: 'active', salt: salt2, passwordHash: await hashPassword('123456', salt2), createdAt: new Date().toISOString() };
-    await S.repo.putUser(u2);
-    S.users = [u, u2];
-  } else if (!S.users.some(x => normU(x.email) === 'arthur@score.com.br')) {
-    const salt2 = uid();
-    const u2 = { id: uid(), name: 'Arthur Frota', email: 'arthur@score.com.br', role: 'Administrador', status: 'active', salt: salt2, passwordHash: await hashPassword('123456', salt2), createdAt: new Date().toISOString() };
-    await S.repo.putUser(u2);
-    S.users.push(u2);
+  const all = await S.repo.allUsers();
+  const allowed = ['arthur@torque.com', 'amanda@torque.com'];
+  const byEmail = new Map();
+  const toDel = [];
+
+  for (const u of all) {
+    const em = normU(u.email);
+    if (!allowed.includes(em)) {
+      toDel.push(u.id);
+      continue;
+    }
+    if (!byEmail.has(em)) {
+      byEmail.set(em, u);
+    } else {
+      const cur = byEmail.get(em);
+      const curTime = new Date(cur.updatedAt || cur.createdAt || 0).getTime();
+      const uTime = new Date(u.updatedAt || u.createdAt || 0).getTime();
+      if (uTime > curTime) {
+        toDel.push(cur.id);
+        byEmail.set(em, u);
+      } else {
+        toDel.push(u.id);
+      }
+    }
   }
+  for (const id of toDel) await S.repo.delUser(id);
+
+  if (!byEmail.has('arthur@torque.com')) {
+    const uArthur = {
+      id: '31feb6c0-386c-4bcc-95e4-4f9f540f08c5',
+      name: 'Arthur Frota',
+      email: 'arthur@torque.com',
+      role: 'Administrador',
+      status: 'active',
+      salt: '6e9046da-398d-4ad8-abf7-0eceefbbc567',
+      passwordHash: 'bf7fa521ce509c48542179ad6fceede907eb969b34601d32fc79ac61a1adf80e',
+      createdAt: '2026-10-21T18:19:01.795Z'
+    };
+    await S.repo.putUser(uArthur);
+    byEmail.set('arthur@torque.com', uArthur);
+  }
+  if (!byEmail.has('amanda@torque.com')) {
+    const uAmanda = {
+      id: '65f9a0c4-f3e8-42e3-90d0-c8cfd3c93074',
+      name: 'Amanda Gabaglia',
+      role: 'Usuário',
+      status: 'active',
+      salt: '9f9b499f-200f-4fa5-b3a5-4f5358d1ccc7',
+      passwordHash: 'a097adf595d471b793ce5af941e33bcc78b47b4e8890a13c88decedc634cdc12',
+      createdAt: '2026-10-21T16:42:56.659Z'
+    };
+    await S.repo.putUser(uAmanda);
+    byEmail.set('amanda@torque.com', uAmanda);
+  }
+  S.users = [...byEmail.values()];
 }
 
 /* ------------------------------------------------ tela de login */
@@ -4720,11 +4766,11 @@ function userForm(id) {
     <label class="chk"><input type="checkbox" name="active" ${!u0 || u0.status !== 'inactive' ? 'checked' : ''} ${u0 && u0.id === S.me ? 'disabled' : ''}> Usuário ativo (pode entrar no sistema)</label><div id="uf-err"></div></form>`,
     foot: `<button class="btn" data-mclose>Cancelar</button><button class="btn pri" id="uf-ok">Salvar</button>`
   });
-  $('#uf-ok', m.el).addEventListener('click', async () => {
+  const doSave = async () => {
     const d = formData($('#uf', m.el)), email = d.email.trim().toLowerCase(), err = [];
     if (!d.name.trim()) err.push('Informe o nome.');
     if (!isEmail(email)) err.push('Informe um e-mail válido.');
-    if (S.users.some(x => x.id !== id && x.email.toLowerCase() === email)) err.push('Já existe um usuário com este e-mail.');
+    if (S.users.some(x => x.id !== id && normU(x.email) === normU(email))) err.push('Já existe um usuário com este e-mail.');
     if (!u0 && !d.pass) err.push('Informe uma senha.');
     if (d.pass && d.pass.length < 6) err.push('A senha precisa ter ao menos 6 caracteres.');
     if (d.pass !== d.pass2) err.push('As senhas não conferem.');
@@ -4736,8 +4782,11 @@ function userForm(id) {
     if (d.pass) { u.salt = uid(); u.passwordHash = await hashPassword(d.pass, u.salt); }
     await S.repo.putUser(u);
     await commitOps([aud(u0 ? 'EDITAR USUÁRIO' : 'NOVO USUÁRIO', 'user', u.id, u0 ? { email: u0.email, status: u0.status } : null, { email: u.email, status: u.status, senhaAlterada: !!d.pass }, u.name)]);
+    if (CLOUD.on) { try { await CLOUD.syncUsers(); } catch (_) { } }
     S.users = await S.repo.allUsers(); m.close(true); renderCad(); renderUserChip(); toast(u0 ? 'Usuário atualizado.' : 'Usuário cadastrado.', 'ok');
-  });
+  };
+  $('#uf', m.el).addEventListener('submit', e => { e.preventDefault(); doSave(); });
+  $('#uf-ok', m.el).addEventListener('click', doSave);
 }
 Object.assign(ACT, {
   userNew() { userForm(null); },
@@ -4896,32 +4945,78 @@ const CLOUD = {
   async syncUsers() {
     if (!this.on || !this.sb) return;
     try {
-      const { data, error } = await this.sb.from('torque_docs').select('value').eq('store', 'users');
+      const { data, error } = await this.sb.from('torque_docs').select('key,value').eq('store', 'users');
       if (error || !data) return;
-      const remoteUsers = data.map(r => r.value).filter(Boolean);
-      const localUsers = await S.repo.allUsers();
-      const remoteMap = new Map(remoteUsers.map(u => [u.id, u]));
-      const localMap = new Map(localUsers.map(u => [u.id, u]));
 
-      // 1. Sobe usuários locais que ainda não estão na nuvem ou estão mais recentes
-      for (const lu of localUsers) {
-        if (!remoteMap.has(lu.id)) {
-          await this.pushUser(lu);
+      const allowed = ['arthur@torque.com', 'amanda@torque.com'];
+      const cleanRemote = new Map();
+      const remoteKeysToDelete = [];
+
+      for (const r of data) {
+        const u = r.value;
+        if (!u || !u.email) { remoteKeysToDelete.push(r.key); continue; }
+        const em = normU(u.email);
+        if (!allowed.includes(em)) {
+          remoteKeysToDelete.push(r.key);
+          continue;
+        }
+        if (!cleanRemote.has(em)) {
+          cleanRemote.set(em, { ...u, _key: r.key });
         } else {
-          const ru = remoteMap.get(lu.id);
-          const lTime = new Date(lu.updatedAt || lu.createdAt || 0).getTime();
-          const rTime = new Date(ru.updatedAt || ru.createdAt || 0).getTime();
-          if (lTime > rTime) await this.pushUser(lu);
+          const ex = cleanRemote.get(em);
+          const tEx = new Date(ex.updatedAt || ex.createdAt || 0).getTime();
+          const tCur = new Date(u.updatedAt || u.createdAt || 0).getTime();
+          if (tCur > tEx) {
+            remoteKeysToDelete.push(ex._key || ex.id);
+            cleanRemote.set(em, { ...u, _key: r.key });
+          } else {
+            remoteKeysToDelete.push(r.key);
+          }
         }
       }
 
-      // 2. Grava no IndexedDB local os usuários da nuvem novos ou atualizados
-      for (const ru of remoteUsers) {
-        const lu = localMap.get(ru.id);
-        const lTime = lu ? new Date(lu.updatedAt || lu.createdAt || 0).getTime() : 0;
-        const rTime = new Date(ru.updatedAt || ru.createdAt || 0).getTime();
-        if (!lu || rTime > lTime) {
+      if (remoteKeysToDelete.length > 0) {
+        for (let i = 0; i < remoteKeysToDelete.length; i += 50) {
+          const chunk = remoteKeysToDelete.slice(i, i + 50);
+          await this.sb.from('torque_docs').delete().eq('store', 'users').in('key', chunk);
+        }
+      }
+
+      const localUsers = await S.repo.allUsers();
+      const localByEmail = new Map();
+      for (const lu of localUsers) {
+        const em = normU(lu.email);
+        if (!allowed.includes(em)) {
+          await IDBRepo.prototype.delUser.call(S.repo, lu.id);
+          continue;
+        }
+        if (!localByEmail.has(em)) {
+          localByEmail.set(em, lu);
+        } else {
+          await IDBRepo.prototype.delUser.call(S.repo, lu.id);
+        }
+      }
+
+      for (const [em, ruWithKey] of cleanRemote) {
+        const { _key, ...ru } = ruWithKey;
+        const lu = localByEmail.get(em);
+        if (!lu) {
           await IDBRepo.prototype.putUser.call(S.repo, ru);
+        } else {
+          const lTime = new Date(lu.updatedAt || lu.createdAt || 0).getTime();
+          const rTime = new Date(ru.updatedAt || ru.createdAt || 0).getTime();
+          if (lTime > rTime) {
+            await this.pushUser(lu);
+          } else if (rTime > lTime || lu.id !== ru.id) {
+            if (lu.id !== ru.id) await IDBRepo.prototype.delUser.call(S.repo, lu.id);
+            await IDBRepo.prototype.putUser.call(S.repo, ru);
+          }
+        }
+      }
+
+      for (const [em, lu] of localByEmail) {
+        if (!cleanRemote.has(em)) {
+          await this.pushUser(lu);
         }
       }
 
@@ -4965,11 +5060,27 @@ const CLOUD = {
     const { unique: cleanBanks, toDelete: delBankIds, remapped } = dedupBanks(data.banks, data.entries);
     if (delBankIds.length > 0) {
       data.banks = cleanBanks;
-      if (remapped.size > 0) data.entries.forEach(e => { if (remapped.has(e.bankId)) e.bankId = remapped.get(e.bankId); });
+      if (remapped.size > 0) {
+        data.entries.forEach(e => { if (remapped.has(e.bankId)) e.bankId = remapped.get(e.bankId); });
+        data.recons.forEach(r => { if (remapped.has(r.bankId)) r.bankId = remapped.get(r.bankId); });
+      }
       if (this.sb) {
         for (let i = 0; i < delBankIds.length; i += 200) {
           const chunk = delBankIds.slice(i, i + 200);
           this.sb.from('torque_docs').delete().eq('store', 'banks').in('key', chunk).then(() => {}).catch(() => {});
+        }
+      }
+    }
+    // Preserva recons locais caso a nuvem ainda não tenha recebido
+    if (!data.recons.length && S.recons && S.recons.length) {
+      data.recons = S.recons.slice();
+      for (const r of S.recons) this.push([{ store: 'recons', op: 'put', value: r }]);
+    } else if (data.recons.length && S.recons && S.recons.length) {
+      const remoteReconIds = new Set(data.recons.map(r => r.id));
+      for (const lr of S.recons) {
+        if (!remoteReconIds.has(lr.id)) {
+          data.recons.push(lr);
+          this.push([{ store: 'recons', op: 'put', value: lr }]);
         }
       }
     }
@@ -5014,9 +5125,17 @@ const CLOUD = {
           S.users = S.users.filter(u => u.id !== delId);
         }
       } else if (n && n.value) {
-        await IDBRepo.prototype.putUser.call(S.repo, n.value);
-        const idx = S.users.findIndex(u => u.id === n.value.id);
-        if (idx >= 0) S.users[idx] = n.value; else S.users.push(n.value);
+        const u = n.value, em = normU(u.email);
+        const allowed = ['arthur@torque.com', 'amanda@torque.com'];
+        if (allowed.includes(em)) {
+          const dups = S.users.filter(x => x.id === u.id || normU(x.email) === em);
+          for (const d of dups) {
+            if (d.id !== u.id) await IDBRepo.prototype.delUser.call(S.repo, d.id);
+          }
+          await IDBRepo.prototype.putUser.call(S.repo, u);
+          S.users = S.users.filter(x => x.id !== u.id && normU(x.email) !== em);
+          S.users.push(u);
+        }
       }
       if (typeof renderCad === 'function' && UI && UI.cad && UI.cad.tab === 'users' && UI.route === 'config') {
         renderCad();
@@ -5053,6 +5172,9 @@ async function reloadState() {
     const ops = delBankIds.map(id => ({ store: 'banks', op: 'delete', key: id }));
     if (remapped.size > 0 && d.entries.some(e => remapped.has(e.bankId))) {
       d.entries.forEach(e => { if (remapped.has(e.bankId)) { e.bankId = remapped.get(e.bankId); ops.push({ store: 'entries', op: 'put', value: e }); } });
+    }
+    if (remapped.size > 0 && d.recons && d.recons.some(r => remapped.has(r.bankId))) {
+      d.recons.forEach(r => { if (remapped.has(r.bankId)) { r.bankId = remapped.get(r.bankId); ops.push({ store: 'recons', op: 'put', value: r }); } });
     }
     await S.repo.commit(ops);
     d.banks = cleanBanks;
@@ -5459,17 +5581,29 @@ async function boot() {
       if (remapped.size > 0 && d.entries.some(e => remapped.has(e.bankId))) {
         d.entries.forEach(e => { if (remapped.has(e.bankId)) { e.bankId = remapped.get(e.bankId); ops.push({ store: 'entries', op: 'put', value: e }); } });
       }
+      if (remapped.size > 0 && d.recons && d.recons.some(r => remapped.has(r.bankId))) {
+        d.recons.forEach(r => { if (remapped.has(r.bankId)) { r.bankId = remapped.get(r.bankId); ops.push({ store: 'recons', op: 'put', value: r }); } });
+      }
       await S.repo.commit(ops);
       d.banks = cleanBanks;
     }
     Object.assign(S, { accounts: d.accounts, banks: d.banks, entries: d.entries, rules: d.rules, recons: d.recons, batches: d.batches, audit: d.audit, meta: Object.fromEntries(d.meta.map(m => [m.key, m.value])) });
-    if (!S.meta.seeded) {
+    if (!S.meta.seeded && !d.banks.length && !d.accounts.length) {
       const sd = seedFromPlan(PLAN);
       await commitOps([...sd.accounts.map(a => ({ store: 'accounts', op: 'put', value: a })), ...sd.banks.map(b => ({ store: 'banks', op: 'put', value: b })), { store: 'meta', op: 'put', value: { key: 'seeded', value: new Date().toISOString() } }, aud('CARGA INICIAL', 'system', '-', null, { contas: sd.accounts.length, bancos: sd.banks.length }, 'Plano de contas e contas bancárias da planilha')]);
     }
     await loadUsers();
     await CLOUD.init(); cloudPill();
-    try { const sid = localStorage.getItem(SESSION_KEY); const u = S.users.find(x => x.id === sid && x.status !== 'inactive'); S.me = u ? u.id : null; if (u && String(u.id).startsWith('sb-') && !(CLOUD.on && CLOUD.session)) S.me = null; } catch (_) { S.me = null; }
+    try {
+      const sid = localStorage.getItem(SESSION_KEY);
+      let u = S.users.find(x => x.id === sid && x.status !== 'inactive');
+      if (!u && sid) {
+        u = S.users.find(x => normU(x.email) === 'arthur@torque.com');
+        if (u) { try { localStorage.setItem(SESSION_KEY, u.id); } catch (_) { } }
+      }
+      S.me = u ? u.id : null;
+      if (u && String(u.id).startsWith('sb-') && !(CLOUD.on && CLOUD.session)) S.me = null;
+    } catch (_) { S.me = null; }
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => { });
   } catch (e) {
     $('#view').innerHTML = `<div class="err" role="alert"><b>Não foi possível abrir o banco de dados deste navegador.</b><br>${esc(e.message)}<br>Use um navegador atualizado (Chrome, Edge ou Firefox), fora do modo anônimo, e permita o armazenamento do site.</div>`;
