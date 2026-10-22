@@ -869,6 +869,27 @@ textarea.in{resize:vertical;min-height:84px;line-height:1.45;padding:10px 12px}
 /* valores em cinza, sem etiqueta colorida */
 .vl.v-in,.vl.v-out,.t.fxt tr:hover .vl.v-in,.t.fxt tr:hover .vl.v-out{background:none;color:#4b5565;padding:0;border-radius:0;font-weight:700}
 
+/* ===== CONTROLE MANUAL DE SALDOS: Planilha Digital Interativa ===== */
+.msld-table{table-layout:auto;width:100%;min-width:980px}
+.msld-table th{background:#f8fafc;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;padding:10px 8px;border-bottom:1.5px solid #e2e8f0;white-space:nowrap}
+.msld-table td{padding:9px 8px;font-size:13px;vertical-align:middle;border-bottom:1px solid #f1f5f9;transition:background .12s}
+.msld-table tbody tr:hover td{background:#f8fafc}
+.msld-table tfoot td{background:#f8fafc;font-weight:800;border-top:2px solid #cbd5e1;padding:12px 8px}
+.cat-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:0.02em;white-space:nowrap}
+.cat-badge.sp{background:#EEF2FF;color:#4338CA;border:1px solid rgba(99,102,241,0.25)}
+.cat-badge.serv{background:#ECFDF5;color:#047857;border:1px solid rgba(16,185,129,0.25)}
+.cat-badge.peca{background:#F0F9FF;color:#0369A1;border:1px solid rgba(14,165,233,0.25)}
+.cat-badge.sal{background:#FFFBEB;color:#B45309;border:1px solid rgba(245,158,11,0.25)}
+.cat-badge.op{background:#FEF2F2;color:#B91C1C;border:1px solid rgba(239,68,68,0.25)}
+.cat-badge.out{background:#F1F5F9;color:#475569;border:1px solid rgba(148,163,184,0.25)}
+.msld-os{font-family:var(--mono);font-weight:700;color:#64748b;font-size:12px}
+.msld-tot{font-weight:800;font-variant-numeric:tabular-nums}
+.msld-val-serv{color:#15803d;font-weight:600;font-variant-numeric:tabular-nums}
+.msld-val-peca{color:#0284c7;font-weight:600;font-variant-numeric:tabular-nums}
+.msld-val-sai{color:#dc2626;font-weight:600;font-variant-numeric:tabular-nums}
+.msld-chip-pg{background:#f1f5f9;color:#334155;font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid #e2e8f0;font-weight:600}
+.msld-chip-bk{background:#f8fafc;color:#475569;font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid #e2e8f0;font-weight:700;font-family:var(--mono)}
+
 /* ===== nuvem ===== */
 .cloud-pill{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:99px;font-size:12px;font-weight:700;border:1px solid var(--bd);background:#fff;color:var(--tx2);transition:all .2s var(--ease);margin-right:10px;white-space:nowrap}
 .cloud-pill i{width:8px;height:8px;border-radius:50%;background:#9aa3b2;flex:none}
@@ -1962,10 +1983,10 @@ const debounce = (fn, ms = 200) => { let t; return (...a) => { clearTimeout(t); 
      métodos (all / commit / replaceAll / wipe) apontando para uma API HTTP.
    - commit() grava VÁRIOS registros em UMA transação: ou grava tudo ou nada.
    ===================================================================== */
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 /* 'users' fica fora de STORES de propósito: backup, restauração e "apagar dados" não mexem nos acessos */
 const USERS_STORE = 'users';
-const STORES = { accounts: 'code', banks: 'id', entries: 'id', batches: 'id', rules: 'key', recons: 'id', audit: 'id', meta: 'key' };
+const STORES = { accounts: 'code', banks: 'id', entries: 'id', batches: 'id', rules: 'key', recons: 'id', audit: 'id', meta: 'key', manual_saldos: 'id' };
 
 class IDBRepo {
   constructor(name = 'torque_db') { this.name = name; this.db = null; }
@@ -2703,7 +2724,7 @@ function readTable(kind, buf, opts = {}) {
 /* =====================================================================
    TORQUE · estado global, modais, avisos, seletor de plano de contas
    ===================================================================== */
-const S = { users: [], me: null, accounts: [], banks: [], entries: [], rules: [], recons: [], batches: [], audit: [], meta: {}, repo: null };
+const S = { users: [], me: null, accounts: [], banks: [], entries: [], rules: [], recons: [], batches: [], audit: [], meta: {}, manual_saldos: [], repo: null };
 
 const ico = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const ICON = {
@@ -3085,7 +3106,7 @@ const UI = {
   fx: { ref: 'ALL', view: (() => { try { return localStorage.getItem('torque_fx_view') || 'all'; } catch (_) { return 'all'; } })(), year: 'ALL', month: 'ALL', bank: 'ALL', type: 'ALL', status: 'ALL', code: null, q: '', unc: false, sort: { k: 'date', d: -1 }, page: 1, sel: new Set() },
   dm: { year: null, month: null, open: new Set() },
   da: { year: null, open: new Set() },
-  saldos: { tab: 'geral', year: new Date().getFullYear(), month: 'ALL', bank: 'ALL', split: 50 },
+  saldos: { tab: 'geral', year: new Date().getFullYear(), month: 'ALL', tipo: 'ALL', cat: 'ALL', pagamento: 'ALL', banco: 'ALL', q: '', sort: { k: 'date', d: -1 }, page: 1 },
   flash: new Map(), kpiEnter: false,
   cad: { tab: 'users', q: '', open: new Set(), loaded: false }
 };
@@ -4387,201 +4408,569 @@ document.addEventListener('change', e => {
 });
 
 /* =====================================================================
-   TORQUE · módulo CONTROLE DE SALDOS (Serviços e Peças)
-   - Controles simultâneos e individuais de Serviços e Peças
+   TORQUE · módulo CONTROLE MANUAL DE SALDOS (Planilha Digital Interativa)
+   - Preenchimento manual de Entradas, Saídas, Serviços e Peças
    - Abas: Visão Geral, Serviços, Peças
-   - Gráfico de evolução mensal com curvas suaves (SVG), grid e tooltips
-   - Tabela analítica mês a mês e modal de drilldown
-   - Preservação estrita dos módulos, animações e integridade contábil
+   - Cálculos automáticos de Saldos de Serviços, Peças e Geral
+   - Tabela editável semelhante ao Excel com filtros e exportação .xlsx
+   - Armazenamento próprio e independente (sem alterar o financeiro oficial)
    ===================================================================== */
-const KW_PECA = /pe[çc]a|pneu|oleo|óleo|filtro|bateria|amortecedor|disco|pastilha|vela|correia|produto|mercadoria|lubrificante|insumo|aditivo|suspens|escapamento|radiador|palheta/i;
-const KW_SERV = /servi[çc]|m[ãa]o de obra|mecanica|mecânica|alinhamento|balanceamento|revis[ãa]o|troca|instala[çc]|reparo|conserto|geometria|diagn[oó]stico|funilaria|pintura|ar condicionado|higieniza/i;
+const DEFAULT_MANUAL_CATEGORIAS = [
+  'SERV + PEÇAS',
+  'SERVIÇO',
+  'FORNECEDOR DE PEÇAS',
+  'SALÁRIO',
+  'OUTROS',
+  'GASTOS OPERACIONAIS'
+];
 
-function classifySaldosData(year, month, bankId, splitPct) {
-  const months = Array.from({ length: 12 }, (_, i) => ({
-    m: i + 1,
-    name: MONTHS[i],
-    shortName: mShort(i),
-    servRec: 0, servCusto: 0,
-    pecaRec: 0, pecaCusto: 0,
-    totRec: 0, totCusto: 0,
-    servMargem: 0, pecaMargem: 0, totMargem: 0,
-    entries: []
-  }));
+const DEFAULT_PAGAMENTOS = [
+  'PIX',
+  'Cartão de Crédito',
+  'Cartão de Débito',
+  'Dinheiro',
+  'Boleto',
+  'Transferência',
+  'Cheque',
+  'Outro'
+];
 
-  let totServRec = 0, totServCusto = 0;
-  let totPecaRec = 0, totPecaCusto = 0;
+function getManualCfg() {
+  const meta = (typeof S !== 'undefined' && S.meta) ? S.meta : {};
+  let cfg = meta.manual_saldos_cfg;
+  if (!cfg) {
+    try { cfg = JSON.parse(localStorage.getItem('torque_manual_saldos_cfg') || '{}'); } catch (_) { cfg = {}; }
+  }
+  return {
+    saldoInicialServicos: cfg.saldoInicialServicos || 0,
+    saldoInicialPecas: cfg.saldoInicialPecas || 0,
+    customCategorias: Array.isArray(cfg.customCategorias) ? cfg.customCategorias : []
+  };
+}
 
-  const validEntries = S.entries.filter(e => {
-    if (e.efetivado === false || e.status === 'cancelado') return false;
-    const y = +e.date.slice(0, 4), m = +e.date.slice(5, 7);
-    if (y !== +year) return false;
-    if (month !== 'ALL' && m !== +month) return false;
-    if (bankId !== 'ALL' && e.bankId !== bankId) return false;
-    if ([887, 888].includes(+e.code)) return false;
-    return true;
-  });
+function getManualCategorias() {
+  const cfg = getManualCfg();
+  return [...new Set([...DEFAULT_MANUAL_CATEGORIAS, ...cfg.customCategorias])];
+}
 
-  validEntries.forEach(e => {
-    const mIdx = +e.date.slice(5, 7) - 1;
-    const bucket = months[mIdx];
-    bucket.entries.push(e);
+function catBadge(cat) {
+  const c = String(cat || '').toUpperCase();
+  let cls = 'out';
+  if (c.includes('SERV') && c.includes('PEÇ')) cls = 'sp';
+  else if (c.includes('SERV')) cls = 'serv';
+  else if (c.includes('PEÇ') || c.includes('FORNEC')) cls = 'peca';
+  else if (c.includes('SALÁRIO') || c.includes('SALARIO')) cls = 'sal';
+  else if (c.includes('OPERACIONAL')) cls = 'op';
+  return `<span class="cat-badge ${cls}">${esc(cat || 'OUTROS')}</span>`;
+}
 
-    const c = +e.code;
-    const desc = (e.desc || '') + ' ' + (e.obs || '');
+function calculateManualTotals(list, initialCfg) {
+  let entServ = 0, saiServ = 0;
+  let entPeca = 0, saiPeca = 0;
+  let despGeral = 0;
 
-    if ([421, 422, 423, 424, 4299, 431, 4399].includes(c) || (e.type === 'SAIDA' && KW_PECA.test(desc))) {
-      bucket.pecaCusto += e.cents;
-      totPecaCusto += e.cents;
-    } else if ([441, 442, 443].includes(c) || (e.type === 'SAIDA' && KW_SERV.test(desc))) {
-      bucket.servCusto += e.cents;
-      totServCusto += e.cents;
-    }
+  list.forEach(item => {
+    const serv = item.servicoCents || 0;
+    const peca = item.pecasCents || 0;
+    const tot = item.totalCents != null ? item.totalCents : (serv + peca);
 
-    if (e.type === 'ENTRADA') {
-      const isServ = KW_SERV.test(desc);
-      const isPeca = KW_PECA.test(desc);
-
-      if (isServ && !isPeca) {
-        bucket.servRec += e.cents;
-        totServRec += e.cents;
-      } else if (isPeca && !isServ) {
-        bucket.pecaRec += e.cents;
-        totPecaRec += e.cents;
-      } else {
-        const sAmt = Math.round(e.cents * (splitPct / 100));
-        const pAmt = e.cents - sAmt;
-        bucket.servRec += sAmt;
-        bucket.pecaRec += pAmt;
-        totServRec += sAmt;
-        totPecaRec += pAmt;
+    if (item.tipo === 'ENTRADA') {
+      entServ += serv;
+      entPeca += peca;
+    } else {
+      saiServ += serv;
+      saiPeca += peca;
+      if (item.afeta === 'geral' || ['SALÁRIO', 'GASTOS OPERACIONAIS', 'OUTROS'].includes(item.categoria)) {
+        if (!serv && !peca) despGeral += tot;
       }
     }
-
-    bucket.totRec = bucket.servRec + bucket.pecaRec;
-    bucket.totCusto = bucket.servCusto + bucket.pecaCusto;
-    bucket.servMargem = bucket.servRec - bucket.servCusto;
-    bucket.pecaMargem = bucket.pecaRec - bucket.pecaCusto;
-    bucket.totMargem = bucket.totRec - bucket.totCusto;
   });
 
-  const totRec = totServRec + totPecaRec;
-  const totCusto = totServCusto + totPecaCusto;
-  const totMargem = totRec - totCusto;
-  const servMargem = totServRec - totServCusto;
-  const pecaMargem = totPecaRec - totPecaCusto;
+  const saldoServPeriodo = entServ - saiServ;
+  const saldoPecaPeriodo = entPeca - saiPeca;
+  const saldoGeralPeriodo = saldoServPeriodo + saldoPecaPeriodo;
+
+  const saldoServAcumulado = (initialCfg.saldoInicialServicos || 0) + saldoServPeriodo;
+  const saldoPecaAcumulado = (initialCfg.saldoInicialPecas || 0) + saldoPecaPeriodo;
+  const saldoGeralAcumulado = saldoServAcumulado + saldoPecaAcumulado;
+  const resultadoGerencialConsolidado = saldoGeralPeriodo - despGeral;
 
   return {
-    months,
-    filteredCount: validEntries.length,
-    totServRec, totServCusto, servMargem,
-    totPecaRec, totPecaCusto, pecaMargem,
-    totRec, totCusto, totMargem,
-    servShare: totRec ? (totServRec / totRec) * 100 : 0,
-    pecaShare: totRec ? (totPecaRec / totRec) * 100 : 0,
-    margemPct: totRec ? (totMargem / totRec) * 100 : 0,
-    servMargemPct: totServRec ? (servMargem / totServRec) * 100 : 0,
-    pecaMargemPct: totPecaRec ? (pecaMargem / totPecaRec) * 100 : 0
+    entServ, saiServ, saldoServPeriodo, saldoServAcumulado,
+    entPeca, saiPeca, saldoPecaPeriodo, saldoPecaAcumulado,
+    saldoGeralPeriodo, saldoGeralAcumulado,
+    despGeral, resultadoGerencialConsolidado
   };
+}
+
+function getFilteredManualSaldos() {
+  const st = UI.saldos;
+  let list = (S.manual_saldos || []).slice();
+
+  if (st.tab === 'servicos') {
+    list = list.filter(x => (x.servicoCents > 0) || x.categoria === 'SERVIÇO' || x.categoria === 'SERV + PEÇAS');
+  } else if (st.tab === 'pecas') {
+    list = list.filter(x => (x.pecasCents > 0) || x.categoria === 'FORNECEDOR DE PEÇAS' || x.categoria === 'SERV + PEÇAS');
+  }
+
+  if (st.year && st.year !== 'ALL') {
+    list = list.filter(x => (x.date || '').slice(0, 4) === String(st.year));
+  }
+  if (st.month && st.month !== 'ALL') {
+    const padM = String(st.month).padStart(2, '0');
+    list = list.filter(x => (x.date || '').slice(5, 7) === padM);
+  }
+
+  if (st.tipo && st.tipo !== 'ALL') {
+    list = list.filter(x => x.tipo === st.tipo);
+  }
+  if (st.cat && st.cat !== 'ALL') {
+    list = list.filter(x => x.categoria === st.cat);
+  }
+  if (st.pagamento && st.pagamento !== 'ALL') {
+    list = list.filter(x => x.pagamento === st.pagamento);
+  }
+  if (st.banco && st.banco !== 'ALL') {
+    list = list.filter(x => x.banco === st.banco);
+  }
+
+  if (st.q && st.q.trim()) {
+    const q = fold(st.q.trim());
+    list = list.filter(x => fold(x.cliente || '').includes(q) || fold(x.os || '').includes(q) || fold(x.obs || '').includes(q) || fold(x.banco || '').includes(q));
+  }
+
+  const { k, d } = st.sort || { k: 'date', d: -1 };
+  list.sort((a, b) => {
+    let vA = a[k] ?? '', vB = b[k] ?? '';
+    if (k === 'totalCents' || k === 'servicoCents' || k === 'pecasCents') {
+      vA = Number(vA) || 0; vB = Number(vB) || 0;
+      return (vA - vB) * d;
+    }
+    return String(vA).localeCompare(String(vB), 'pt-BR', { numeric: true }) * d;
+  });
+
+  return list;
+}
+
+function exportManualSaldosExcel() {
+  const filtered = getFilteredManualSaldos();
+  const headers = ['Data', 'Nº OS', 'Cliente / Descrição', 'Categoria', 'Tipo', 'Serviço (R$)', 'Peças (R$)', 'Total Geral (R$)', 'Forma de Pagamento', 'Banco / Conta', 'Observações'];
+  const rows = [headers];
+
+  filtered.forEach(item => {
+    rows.push([
+      fmtDate(item.date),
+      item.os || '',
+      item.cliente || '',
+      item.categoria || '',
+      item.tipo || '',
+      (item.servicoCents || 0) / 100,
+      (item.pecasCents || 0) / 100,
+      (item.totalCents || 0) / 100,
+      item.pagamento || '',
+      item.banco || '',
+      item.obs || ''
+    ]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Controle de Saldos');
+  const fname = `controle_de_saldos_${UI.saldos.year}_${UI.saldos.month}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  toast('Planilha exportada com sucesso em Excel (.xlsx)!', 'ok');
+}
+
+function manualEntryForm(id) {
+  const isEdit = !!id;
+  const item0 = isEdit ? (S.manual_saldos || []).find(x => x.id === id) : null;
+  const cats = getManualCategorias();
+  const activeBanks = S.banks || [];
+  const bankNames = [...new Set([...activeBanks.map(b => b.name), 'CAIXA', 'BANCO DO BRASIL', 'ITAÚ', 'INTER', 'DINHEIRO'])];
+
+  const m = openModal({
+    title: isEdit ? 'Editar Lançamento na Planilha' : 'Novo Lançamento na Planilha',
+    desc: 'Preenchimento manual gerencial de serviços e peças',
+    body: `
+      <form class="grid" id="mef" novalidate autocomplete="off">
+        <div class="grid g2">
+          <div class="fld">
+            <label for="mef-date">Data</label>
+            ${dtInput({ id: 'mef-date', name: 'date', iso: item0 ? item0.date : todayISO() })}
+          </div>
+          <div class="fld">
+            <label for="mef-os">Nº da OS <span class="muted">(opcional)</span></label>
+            <input class="in" id="mef-os" name="os" placeholder="Ex: 1042" value="${esc(item0 ? item0.os || '' : '')}">
+          </div>
+        </div>
+
+        <div class="fld">
+          <label for="mef-cli">Cliente ou Descrição</label>
+          <input class="in" id="mef-cli" name="cliente" placeholder="Nome do cliente, descrição ou fornecedor" value="${esc(item0 ? item0.cliente || '' : '')}" required>
+        </div>
+
+        <div class="grid g2">
+          <div class="fld">
+            <label for="mef-cat">Categoria</label>
+            <select class="in" id="mef-cat" name="categoria">
+              ${cats.map(c => `<option value="${esc(c)}" ${item0 && item0.categoria === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="fld">
+            <span class="lbl">Tipo de Movimentação</span>
+            <div class="seg" role="radiogroup">
+              <label><input type="radio" class="e" name="tipo" value="ENTRADA" ${!item0 || item0.tipo === 'ENTRADA' ? 'checked' : ''}><span>Entrada</span></label>
+              <label><input type="radio" class="s" name="tipo" value="SAIDA" ${item0 && item0.tipo === 'SAIDA' ? 'checked' : ''}><span>Saída</span></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid g3">
+          <div class="fld">
+            <label for="mef-serv">Valor Serviço (R$)</label>
+            <input class="in" id="mef-serv" name="servico" data-money inputmode="numeric" placeholder="R$ 0,00" value="${item0 && item0.servicoCents ? 'R$ ' + numBR(item0.servicoCents) : ''}">
+          </div>
+          <div class="fld">
+            <label for="mef-peca">Valor Peças (R$)</label>
+            <input class="in" id="mef-peca" name="pecas" data-money inputmode="numeric" placeholder="R$ 0,00" value="${item0 && item0.pecasCents ? 'R$ ' + numBR(item0.pecasCents) : ''}">
+          </div>
+          <div class="fld">
+            <label for="mef-tot">Total Geral (R$)</label>
+            <input class="in" id="mef-tot" name="total" placeholder="R$ 0,00" value="${item0 && item0.totalCents ? 'R$ ' + numBR(item0.totalCents) : 'R$ 0,00'}" readonly style="background:#f8fafc;font-weight:700">
+          </div>
+        </div>
+
+        <div class="grid g2">
+          <div class="fld">
+            <label for="mef-pg">Forma de Pagamento</label>
+            <select class="in" id="mef-pg" name="pagamento">
+              ${DEFAULT_PAGAMENTOS.map(p => `<option value="${esc(p)}" ${item0 && item0.pagamento === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="fld">
+            <label for="mef-bk">Banco / Conta</label>
+            <input class="in" id="mef-bk" name="banco" list="mef-bk-list" placeholder="Selecione ou digite o banco" value="${esc(item0 ? item0.banco || '' : 'BANCO DO BRASIL')}">
+            <datalist id="mef-bk-list">
+              ${bankNames.map(b => `<option value="${esc(b)}">`).join('')}
+            </datalist>
+          </div>
+        </div>
+
+        <div class="fld">
+          <label for="mef-obs">Observações <span class="muted">(opcional)</span></label>
+          <textarea class="in" id="mef-obs" name="obs" rows="2" placeholder="Detalhes, garantia, peças aplicadas, notas...">${esc(item0 ? item0.obs || '' : '')}</textarea>
+        </div>
+
+        <div id="mef-err"></div>
+      </form>
+    `,
+    foot: `
+      <button class="btn" data-mclose>Cancelar</button>
+      <button class="btn pri" id="mef-save">${isEdit ? 'Salvar Alterações' : 'Adicionar Lançamento'}</button>
+    `
+  });
+
+  const calcTot = () => {
+    const sCents = parseMoney($('#mef-serv', m.el).value) || 0;
+    const pCents = parseMoney($('#mef-peca', m.el).value) || 0;
+    const totCents = sCents + pCents;
+    $('#mef-tot', m.el).value = 'R$ ' + numBR(totCents);
+  };
+  $('#mef-serv', m.el).addEventListener('input', calcTot);
+  $('#mef-peca', m.el).addEventListener('input', calcTot);
+
+  const doSave = async () => {
+    const f = $('#mef', m.el);
+    const d = formData(f);
+    const date = d.date || todayISO();
+    const cliente = (d.cliente || '').trim();
+    if (!cliente) {
+      $('#mef-err', m.el).innerHTML = '<div class="err">Informe o cliente ou descrição do lançamento.</div>';
+      return;
+    }
+    const servCents = parseMoney(d.servico) || 0;
+    const pecaCents = parseMoney(d.pecas) || 0;
+    let totCents = servCents + pecaCents;
+    if (totCents === 0 && d.total) {
+      totCents = parseMoney(d.total) || 0;
+    }
+    if (totCents === 0) {
+      $('#mef-err', m.el).innerHTML = '<div class="err">Informe o valor de serviços, peças ou o total.</div>';
+      return;
+    }
+
+    const entry = {
+      id: item0 ? item0.id : uid(),
+      date,
+      os: (d.os || '').trim(),
+      cliente,
+      categoria: d.categoria || 'OUTROS',
+      tipo: d.tipo || 'ENTRADA',
+      servicoCents: servCents,
+      pecasCents: pecaCents,
+      totalCents: totCents,
+      pagamento: d.pagamento || 'PIX',
+      banco: (d.banco || '').trim() || 'CAIXA',
+      obs: (d.obs || '').trim(),
+      afeta: (d.categoria === 'SALÁRIO' || d.categoria === 'GASTOS OPERACIONAIS' || d.categoria === 'OUTROS') ? 'geral' : (servCents && pecaCents ? 'ambos' : servCents ? 'servicos' : 'pecas'),
+      createdAt: item0 ? item0.createdAt : new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (!Array.isArray(S.manual_saldos)) S.manual_saldos = [];
+    const idx = S.manual_saldos.findIndex(x => x.id === entry.id);
+    if (idx >= 0) S.manual_saldos[idx] = entry; else S.manual_saldos.unshift(entry);
+
+    try { localStorage.setItem('torque_manual_saldos', JSON.stringify(S.manual_saldos)); } catch (_) { }
+    try {
+      await commitOps([{ store: 'manual_saldos', op: 'put', value: entry }]);
+    } catch (_) { }
+
+    m.close(true);
+    renderSaldos();
+    toast(isEdit ? 'Lançamento atualizado com sucesso.' : 'Lançamento registrado na planilha.', 'ok');
+  };
+
+  $('#mef', m.el).addEventListener('submit', e => { e.preventDefault(); doSave(); });
+  $('#mef-save', m.el).addEventListener('click', doSave);
+}
+
+async function manualEntryDel(id) {
+  const item = (S.manual_saldos || []).find(x => x.id === id);
+  if (!item) return;
+  const ok = await confirmBox({
+    title: 'Excluir Lançamento',
+    message: `Deseja realmente excluir o lançamento de <b>${esc(item.cliente)}</b> no valor de <b>${brl(item.totalCents)}</b>?`,
+    ok: 'Sim, excluir',
+    cancel: 'Cancelar',
+    danger: true
+  });
+  if (!ok) return;
+
+  S.manual_saldos = S.manual_saldos.filter(x => x.id !== id);
+  try { localStorage.setItem('torque_manual_saldos', JSON.stringify(S.manual_saldos)); } catch (_) { }
+  try {
+    await commitOps([{ store: 'manual_saldos', op: 'delete', key: id }]);
+  } catch (_) { }
+
+  renderSaldos();
+  toast('Lançamento excluído da planilha.', 'ok');
+}
+
+function manualCfgModal() {
+  const cfg = getManualCfg();
+  const m = openModal({
+    title: 'Configurações de Saldos Iniciais',
+    desc: 'Defina saldos iniciais gerenciais e gerencie categorias personalizadas',
+    body: `
+      <form class="grid" id="mcfg" novalidate autocomplete="off">
+        <div class="note" style="margin-bottom:10px">
+          Os saldos iniciais são somados ao acumulado gerencial do período e não alteram o financeiro oficial.
+        </div>
+        <div class="grid g2">
+          <div class="fld">
+            <label for="mcfg-iserv">Saldo Inicial Serviços (R$)</label>
+            <input class="in" id="mcfg-iserv" name="saldoInicialServicos" data-money inputmode="numeric" placeholder="R$ 0,00" value="${cfg.saldoInicialServicos ? 'R$ ' + numBR(cfg.saldoInicialServicos) : ''}">
+          </div>
+          <div class="fld">
+            <label for="mcfg-ipeca">Saldo Inicial Peças (R$)</label>
+            <input class="in" id="mcfg-ipeca" name="saldoInicialPecas" data-money inputmode="numeric" placeholder="R$ 0,00" value="${cfg.saldoInicialPecas ? 'R$ ' + numBR(cfg.saldoInicialPecas) : ''}">
+          </div>
+        </div>
+        <div class="fld" style="margin-top:6px">
+          <label for="mcfg-newcat">Adicionar Nova Categoria Personalizada</label>
+          <div style="display:flex;gap:8px">
+            <input class="in" id="mcfg-newcat" placeholder="Nome da categoria (ex: TERCEIRIZADOS)">
+            <button type="button" class="btn" id="mcfg-addcat">${ICON.plus} Adicionar</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Categorias Ativas</label>
+          <div id="mcfg-catlist" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
+            ${getManualCategorias().map(c => `
+              <span class="chip" style="display:inline-flex;align-items:center;gap:6px">
+                ${esc(c)}
+                ${cfg.customCategorias.includes(c) ? `<button type="button" class="icon" data-delcat="${esc(c)}" style="width:16px;height:16px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0">×</button>` : ''}
+              </span>
+            `).join('')}
+          </div>
+        </div>
+      </form>
+    `,
+    foot: `
+      <button class="btn" data-mclose>Cancelar</button>
+      <button class="btn pri" id="mcfg-save">Salvar Configurações</button>
+    `
+  });
+
+  const customCats = [...cfg.customCategorias];
+
+  $('#mcfg-addcat', m.el).addEventListener('click', () => {
+    const val = ($('#mcfg-newcat', m.el).value || '').trim().toUpperCase();
+    if (!val) return;
+    if (getManualCategorias().includes(val)) return toast('Esta categoria já existe.', 'warn');
+    customCats.push(val);
+    $('#mcfg-newcat', m.el).value = '';
+    renderCatsChip();
+  });
+
+  const renderCatsChip = () => {
+    const all = [...new Set([...DEFAULT_MANUAL_CATEGORIAS, ...customCats])];
+    $('#mcfg-catlist', m.el).innerHTML = all.map(c => `
+      <span class="chip" style="display:inline-flex;align-items:center;gap:6px">
+        ${esc(c)}
+        ${customCats.includes(c) ? `<button type="button" class="icon" data-delcat="${esc(c)}" style="width:16px;height:16px;color:#ef4444;background:none;border:none;cursor:pointer;padding:0">×</button>` : ''}
+      </span>
+    `).join('');
+  };
+
+  m.el.addEventListener('click', e => {
+    const btn = e.target.closest('[data-delcat]');
+    if (!btn) return;
+    const cat = btn.dataset.delcat;
+    const idx = customCats.indexOf(cat);
+    if (idx >= 0) {
+      customCats.splice(idx, 1);
+      renderCatsChip();
+    }
+  });
+
+  $('#mcfg-save', m.el).addEventListener('click', async () => {
+    const sServ = parseMoney($('#mcfg-iserv', m.el).value) || 0;
+    const sPeca = parseMoney($('#mcfg-ipeca', m.el).value) || 0;
+    const newCfg = {
+      saldoInicialServicos: sServ,
+      saldoInicialPecas: sPeca,
+      customCategorias: customCats
+    };
+    S.meta.manual_saldos_cfg = newCfg;
+    try { localStorage.setItem('torque_manual_saldos_cfg', JSON.stringify(newCfg)); } catch (_) { }
+    try {
+      await commitOps([{ store: 'meta', op: 'put', value: { key: 'manual_saldos_cfg', value: newCfg } }]);
+    } catch (_) { }
+    m.close(true);
+    renderSaldos();
+    toast('Configurações de saldos salvas com sucesso.', 'ok');
+  });
 }
 
 function renderSaldos() {
   const st = UI.saldos;
-  const d = classifySaldosData(st.year, st.month, st.bank, st.split);
+  const cfg = getManualCfg();
+  const filteredList = getFilteredManualSaldos();
+  const t = calculateManualTotals(filteredList, cfg);
+
   const isGeral = st.tab === 'geral';
   const isServ = st.tab === 'servicos';
   const isPeca = st.tab === 'pecas';
 
+  // KPI cards
   let kpiCardsHtml = '';
   if (isGeral) {
     kpiCardsHtml = `
-      <div class="card kpi dark">
-        <div class="l">Faturamento Total Gerencial</div>
-        <div class="v">${brl(d.totRec)}</div>
-        <div class="s">${d.filteredCount} lançamento(s) no período</div>
-      </div>
       <div class="card kpi green">
         <div class="l">Saldo de Serviços</div>
-        <div class="v">${brl(d.totServRec)}</div>
-        <div class="s">${d.servShare.toFixed(1)}% do faturamento total</div>
+        <div class="v ${t.saldoServPeriodo < 0 ? 'out-c' : ''}">${brl(t.saldoServPeriodo)}</div>
+        <div class="s">Entradas: ${brl(t.entServ)} · Saídas: ${brl(t.saiServ)}${cfg.saldoInicialServicos ? `<br><small class="muted">Acumulado: ${brl(t.saldoServAcumulado)}</small>` : ''}</div>
       </div>
       <div class="card kpi red">
         <div class="l">Saldo de Peças</div>
-        <div class="v">${brl(d.totPecaRec)}</div>
-        <div class="s">${d.pecaShare.toFixed(1)}% do faturamento total</div>
+        <div class="v ${t.saldoPecaPeriodo < 0 ? 'out-c' : ''}">${brl(t.saldoPecaPeriodo)}</div>
+        <div class="s">Entradas: ${brl(t.entPeca)} · Saídas: ${brl(t.saiPeca)}${cfg.saldoInicialPecas ? `<br><small class="muted">Acumulado: ${brl(t.saldoPecaAcumulado)}</small>` : ''}</div>
+      </div>
+      <div class="card kpi ${t.saldoGeralPeriodo >= 0 ? 'green' : 'red'}">
+        <div class="l">Saldo Geral (Serviços + Peças)</div>
+        <div class="v ${t.saldoGeralPeriodo < 0 ? 'out-c' : ''}">${brl(t.saldoGeralPeriodo)}</div>
+        <div class="s">Resultado direto da operação mecânica e peças</div>
       </div>
       <div class="card kpi dark">
-        <div class="l">Custos Diretos (Peças + Mecânica)</div>
-        <div class="v ${d.totCusto ? 'out-c' : ''}">${brl(d.totCusto)}</div>
-        <div class="s">Peças: ${brl(d.totPecaCusto)} · Comissões: ${brl(d.totServCusto)}</div>
+        <div class="l">Despesas Gerais</div>
+        <div class="v ${t.despGeral ? 'out-c' : ''}">${brl(t.despGeral)}</div>
+        <div class="s">Salários, gastos operacionais e outros</div>
       </div>
-      <div class="card kpi ${d.totMargem >= 0 ? 'green' : 'red'}">
-        <div class="l">Margem Gerencial Consolidada</div>
-        <div class="v ${d.totMargem < 0 ? 'out-c' : ''}">${brl(d.totMargem)}</div>
-        <div class="s">${d.margemPct.toFixed(1)}% de margem sobre faturamento</div>
+      <div class="card kpi ${t.resultadoGerencialConsolidado >= 0 ? 'green' : 'red'}">
+        <div class="l">Resultado Consolidado</div>
+        <div class="v ${t.resultadoGerencialConsolidado < 0 ? 'out-c' : ''}">${brl(t.resultadoGerencialConsolidado)}</div>
+        <div class="s">Saldo Geral líquido menos despesas gerais</div>
       </div>
     `;
   } else if (isServ) {
     kpiCardsHtml = `
       <div class="card kpi green">
-        <div class="l">Faturamento de Serviços</div>
-        <div class="v">${brl(d.totServRec)}</div>
-        <div class="s">${d.servShare.toFixed(1)}% do faturamento da oficina</div>
+        <div class="l">Total Entradas de Serviços</div>
+        <div class="v in-c">${brl(t.entServ)}</div>
+        <div class="s">Faturamento exclusivo de mão de obra e serviços</div>
       </div>
       <div class="card kpi dark">
-        <div class="l">Custos & Comissões de Mecânica</div>
-        <div class="v ${d.totServCusto ? 'out-c' : ''}">${brl(d.totServCusto)}</div>
-        <div class="s">Comissões, troca de óleo e terceirizados</div>
+        <div class="l">Total Saídas de Serviços</div>
+        <div class="v ${t.saiServ ? 'out-c' : ''}">${brl(t.saiServ)}</div>
+        <div class="s">Custos diretos e comissões atribuídas a serviços</div>
       </div>
-      <div class="card kpi ${d.servMargem >= 0 ? 'green' : 'red'}">
-        <div class="l">Margem de Contribuição (Serviços)</div>
-        <div class="v ${d.servMargem < 0 ? 'out-c' : ''}">${brl(d.servMargem)}</div>
-        <div class="s">${d.servMargemPct.toFixed(1)}% de margem líquida em serviços</div>
+      <div class="card kpi ${t.saldoServPeriodo >= 0 ? 'green' : 'red'}">
+        <div class="l">Saldo de Serviços (Período)</div>
+        <div class="v ${t.saldoServPeriodo < 0 ? 'out-c' : ''}">${brl(t.saldoServPeriodo)}</div>
+        <div class="s">Resultado líquido de serviços no filtro selecionado</div>
       </div>
       <div class="card kpi dark">
-        <div class="l">Participação em Serviços</div>
-        <div class="v">${d.servShare.toFixed(1)}%</div>
-        <div class="s">Relação direta Mão de Obra vs Peças</div>
+        <div class="l">Saldo Acumulado de Serviços</div>
+        <div class="v ${t.saldoServAcumulado < 0 ? 'out-c' : ''}">${brl(t.saldoServAcumulado)}</div>
+        <div class="s">Com saldo inicial configurado: ${brl(cfg.saldoInicialServicos)}</div>
       </div>
     `;
   } else {
     kpiCardsHtml = `
       <div class="card kpi red">
-        <div class="l">Faturamento de Peças e Produtos</div>
-        <div class="v">${brl(d.totPecaRec)}</div>
-        <div class="s">${d.pecaShare.toFixed(1)}% do faturamento da oficina</div>
+        <div class="l">Total Entradas de Peças</div>
+        <div class="v in-c">${brl(t.entPeca)}</div>
+        <div class="s">Faturamento com vendas de peças e produtos</div>
       </div>
       <div class="card kpi dark">
-        <div class="l">Custos de Aquisição (Peças/Óleos/Pneus)</div>
-        <div class="v ${d.totPecaCusto ? 'out-c' : ''}">${brl(d.totPecaCusto)}</div>
-        <div class="s">Reposição, óleos, pneus e insumos</div>
+        <div class="l">Total Saídas de Peças</div>
+        <div class="v ${t.saiPeca ? 'out-c' : ''}">${brl(t.saiPeca)}</div>
+        <div class="s">Pagamentos a fornecedores de peças e reposição</div>
       </div>
-      <div class="card kpi ${d.pecaMargem >= 0 ? 'green' : 'red'}">
-        <div class="l">Margem Bruta (Peças)</div>
-        <div class="v ${d.pecaMargem < 0 ? 'out-c' : ''}">${brl(d.pecaMargem)}</div>
-        <div class="s">${d.pecaMargemPct.toFixed(1)}% de margem sobre custo de peças</div>
+      <div class="card kpi ${t.saldoPecaPeriodo >= 0 ? 'green' : 'red'}">
+        <div class="l">Saldo de Peças (Período)</div>
+        <div class="v ${t.saldoPecaPeriodo < 0 ? 'out-c' : ''}">${brl(t.saldoPecaPeriodo)}</div>
+        <div class="s">Resultado líquido de peças no filtro selecionado</div>
       </div>
       <div class="card kpi dark">
-        <div class="l">Participação em Peças</div>
-        <div class="v">${d.pecaShare.toFixed(1)}%</div>
-        <div class="s">Representatividade no mix de faturamento</div>
+        <div class="l">Saldo Acumulado de Peças</div>
+        <div class="v ${t.saldoPecaAcumulado < 0 ? 'out-c' : ''}">${brl(t.saldoPecaAcumulado)}</div>
+        <div class="s">Com saldo inicial configurado: ${brl(cfg.saldoInicialPecas)}</div>
       </div>
     `;
   }
 
-  const activeBanks = S.banks.filter(b => b.active !== false);
-  const years = yearsAvailable();
+  const ys = new Set([new Date().getFullYear()]);
+  (S.manual_saldos || []).forEach(x => { if (x.date) ys.add(+x.date.slice(0, 4)); });
+  const yearsList = [...ys].sort((a, b) => b - a);
+  const cats = getManualCategorias();
+  const activeBanks = S.banks || [];
+  const bankNames = [...new Set([...activeBanks.map(b => b.name), 'CAIXA', 'BANCO DO BRASIL', 'ITAÚ', 'INTER', 'DINHEIRO'])];
+
+  let totServTab = 0, totPecaTab = 0, totGeralTab = 0;
+  filteredList.forEach(x => {
+    totServTab += x.servicoCents || 0;
+    totPecaTab += x.pecasCents || 0;
+    totGeralTab += x.totalCents != null ? x.totalCents : ((x.servicoCents || 0) + (x.pecasCents || 0));
+  });
 
   $('#view').innerHTML = `
     <div class="pg-head">
       <div>
         <h2>Controle de Saldos</h2>
-        <p>Acompanhamento gerencial integrado e individual de Serviços e Peças</p>
+        <p>Planilha digital gerencial de controle de entradas, saídas, serviços e peças</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" data-act="manualCfg" title="Configurar saldos iniciais">${ICON.gear} Saldos Iniciais</button>
+        <button class="btn" data-act="manualExport" title="Exportar planilha para Excel">${ICON.down} Exportar Excel</button>
+        <button class="btn pri" data-act="manualNew" title="Cadastrar novo lançamento">${ICON.plus} Novo Lançamento</button>
       </div>
     </div>
 
     <!-- Navegação de Abas: Visão Geral, Serviços, Peças -->
-    <div class="vsw saldos-tabs" role="tablist" aria-label="Visualização do Controle de Saldos">
+    <div class="vsw saldos-tabs" role="tablist" aria-label="Visualização da Planilha">
       <button role="tab" class="${isGeral ? 'on' : ''}" data-act="saldosTab" data-tab="geral" aria-selected="${isGeral}">
         ${ICON.trend}<span>Visão Geral</span>
       </button>
@@ -4593,352 +4982,154 @@ function renderSaldos() {
       </button>
     </div>
 
-    <!-- Barra de Filtros Gerenciais -->
-    <div class="fbar card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
-      <div class="fld">
-        <label for="sld-y">Ano</label>
-        <select class="in" id="sld-y">
-          ${years.map(y => `<option value="${y}" ${y === st.year ? 'selected' : ''}>${y}</option>`).join('')}
-        </select>
-      </div>
-      <div class="fld">
-        <label for="sld-m">Mês</label>
-        <select class="in" id="sld-m">
-          <option value="ALL" ${st.month === 'ALL' ? 'selected' : ''}>Ano todo (Jan a Dez)</option>
-          ${MONTHS.map((m, i) => `<option value="${i + 1}" ${st.month === String(i + 1) ? 'selected' : ''}>${m}</option>`).join('')}
-        </select>
-      </div>
-      <div class="fld">
-        <label for="sld-b">Conta bancária</label>
-        <select class="in" id="sld-b">
-          <option value="ALL" ${st.bank === 'ALL' ? 'selected' : ''}>Todas as contas</option>
-          ${activeBanks.map(b => `<option value="${b.id}" ${st.bank === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}
-        </select>
-      </div>
-      <div class="fld">
-        <label for="sld-sp" title="Rateio atribuído a serviços nas vendas gerais sem discriminação no extrato">Rateio Vendas Gerais</label>
-        <select class="in" id="sld-sp">
-          <option value="50" ${st.split === 50 ? 'selected' : ''}>50% Serviços / 50% Peças (Padrão)</option>
-          <option value="60" ${st.split === 60 ? 'selected' : ''}>60% Serviços / 40% Peças</option>
-          <option value="70" ${st.split === 70 ? 'selected' : ''}>70% Serviços / 30% Peças</option>
-          <option value="100" ${st.split === 100 ? 'selected' : ''}>100% Serviços</option>
-          <option value="0" ${st.split === 0 ? 'selected' : ''}>100% Peças</option>
-        </select>
-      </div>
-      <span style="flex:1"></span>
-      <div class="note" style="margin:0;font-size:11.5px;padding:6px 10px;align-self:flex-end">
-        Módulo gerencial analítico: não altera lançamentos oficiais.
-      </div>
-    </div>
-
-    <!-- Cards de Indicadores (KPIs) -->
+    <!-- Cards de Indicadores de Saldos Automáticos -->
     <div class="cards enter-cards" style="grid-template-columns:repeat(${isGeral ? 5 : 4},minmax(0,1fr))">
       ${kpiCardsHtml}
     </div>
 
-    <!-- Gráfico de Evolução Mensal -->
-    <div class="cmp-card" style="margin-top:16px">
-      <div class="cmp-hd">
-        <div>
-          <h3>${ICON.trend} Evolução Mensal — ${isGeral ? 'Serviços vs Peças' : isServ ? 'Serviços: Faturamento vs Custos' : 'Peças: Vendas vs Aquisição'}</h3>
-          <p>Acompanhamento comparativo mês a mês ao longo do ano de ${st.year}</p>
-        </div>
-        <div class="cmp-legend" id="saldos-legend">
-          ${isGeral ? `
-            <button class="lg" style="cursor:default"><i style="background:#16A34A"></i>Serviços</button>
-            <button class="lg" style="cursor:default"><i style="background:#FF2C2C"></i>Peças</button>
-          ` : isServ ? `
-            <button class="lg" style="cursor:default"><i style="background:#16A34A"></i>Faturamento Serviços</button>
-            <button class="lg" style="cursor:default"><i style="background:#EAB308"></i>Custos Mecânica</button>
-          ` : `
-            <button class="lg" style="cursor:default"><i style="background:#FF2C2C"></i>Vendas de Peças</button>
-            <button class="lg" style="cursor:default"><i style="background:#F97316"></i>Custos Aquisição</button>
-          `}
-        </div>
+    <!-- Barra de Filtros da Planilha -->
+    <div class="fbar card" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px">
+      <div class="fld" style="min-width:100px">
+        <label for="msld-y">Ano</label>
+        <select class="in" id="msld-y">
+          ${yearsList.map(y => `<option value="${y}" ${y === st.year ? 'selected' : ''}>${y}</option>`).join('')}
+        </select>
       </div>
-      <div class="cmp-chart" id="saldos-chart-container"></div>
+      <div class="fld" style="min-width:130px">
+        <label for="msld-m">Mês</label>
+        <select class="in" id="msld-m">
+          <option value="ALL" ${st.month === 'ALL' ? 'selected' : ''}>Ano todo</option>
+          ${MONTHS.map((m, i) => `<option value="${i + 1}" ${st.month === String(i + 1) ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld" style="min-width:120px">
+        <label for="msld-t">Tipo</label>
+        <select class="in" id="msld-t">
+          <option value="ALL" ${st.tipo === 'ALL' ? 'selected' : ''}>Todos os tipos</option>
+          <option value="ENTRADA" ${st.tipo === 'ENTRADA' ? 'selected' : ''}>Entradas</option>
+          <option value="SAIDA" ${st.tipo === 'SAIDA' ? 'selected' : ''}>Saídas</option>
+        </select>
+      </div>
+      <div class="fld" style="min-width:150px">
+        <label for="msld-c">Categoria</label>
+        <select class="in" id="msld-c">
+          <option value="ALL" ${st.cat === 'ALL' ? 'selected' : ''}>Todas as categorias</option>
+          ${cats.map(c => `<option value="${esc(c)}" ${st.cat === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld" style="min-width:140px">
+        <label for="msld-p">Pagamento</label>
+        <select class="in" id="msld-p">
+          <option value="ALL" ${st.pagamento === 'ALL' ? 'selected' : ''}>Todos pagamentos</option>
+          ${DEFAULT_PAGAMENTOS.map(p => `<option value="${esc(p)}" ${st.pagamento === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld" style="min-width:130px">
+        <label for="msld-b">Banco / Conta</label>
+        <select class="in" id="msld-b">
+          <option value="ALL" ${st.banco === 'ALL' ? 'selected' : ''}>Todos os bancos</option>
+          ${bankNames.map(b => `<option value="${esc(b)}" ${st.banco === b ? 'selected' : ''}>${esc(b)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fld" style="flex:1;min-width:180px">
+        <label for="msld-q">Buscar na planilha</label>
+        <input class="in" id="msld-q" placeholder="Cliente, OS, observação..." value="${esc(st.q || '')}">
+      </div>
+      ${(st.month !== 'ALL' || st.tipo !== 'ALL' || st.cat !== 'ALL' || st.pagamento !== 'ALL' || st.banco !== 'ALL' || st.q) ? `
+        <button class="btn" id="msld-clear" style="align-self:flex-end;margin-bottom:1px" title="Limpar todos os filtros">Limpar</button>
+      ` : ''}
     </div>
 
-    <!-- Tabela Analítica Mês a Mês -->
-    <div class="sect" style="margin-top:20px">
-      <h2>Detalhamento Mensal — ${st.year}</h2>
-      <span class="muted">Valores consolidados por mês com margens e acesso aos lançamentos</span>
-    </div>
-    <div class="tw">
-      <table class="t">
+    <!-- Tabela Planilha Interativa -->
+    <div class="tw fxw" style="margin-top:14px;overflow-x:auto">
+      <table class="t msld-table">
         <thead>
-          ${isGeral ? `
-            <tr>
-              <th>Mês</th>
-              <th class="num right">Faturamento Serviços</th>
-              <th class="num right">Faturamento Peças</th>
-              <th class="num right">Total Geral</th>
-              <th class="num right">Custos Diretos</th>
-              <th class="num right">Margem Gerencial</th>
-              <th class="right" style="width:70px">Ações</th>
-            </tr>
-          ` : isServ ? `
-            <tr>
-              <th>Mês</th>
-              <th class="num right">Receita Serviços</th>
-              <th class="num right">Custos / Comissões</th>
-              <th class="num right">Margem Serviços</th>
-              <th class="num right">Margem (%)</th>
-              <th class="num right">Lançamentos</th>
-              <th class="right" style="width:70px">Ações</th>
-            </tr>
-          ` : `
-            <tr>
-              <th>Mês</th>
-              <th class="num right">Venda de Peças</th>
-              <th class="num right">Custo de Aquisição</th>
-              <th class="num right">Margem Bruta Peças</th>
-              <th class="num right">Margem (%)</th>
-              <th class="num right">Lançamentos</th>
-              <th class="right" style="width:70px">Ações</th>
-            </tr>
-          `}
+          <tr>
+            <th style="width:105px">Data</th>
+            <th style="width:80px">Nº OS</th>
+            <th>Cliente / Descrição</th>
+            <th style="width:140px">Categoria</th>
+            <th style="width:85px;text-align:center">Tipo</th>
+            <th class="num right" style="width:120px">Serviço (R$)</th>
+            <th class="num right" style="width:120px">Peças (R$)</th>
+            <th class="num right" style="width:130px">Total Geral</th>
+            <th style="width:110px">Pagamento</th>
+            <th style="width:110px">Banco</th>
+            <th>Observações</th>
+            <th class="right" style="width:80px;text-align:right">Ações</th>
+          </tr>
         </thead>
         <tbody>
-          ${d.months.map(m => {
-            const hasData = m.totRec > 0 || m.totCusto > 0;
+          ${filteredList.map(item => {
+            const isEnt = item.tipo === 'ENTRADA';
             return `
-              <tr class="${hasData ? '' : 'zero'}">
-                <td><b>${m.name}</b></td>
-                ${isGeral ? `
-                  <td class="num right">${m.servRec ? brl(m.servRec) : '<span class="muted">—</span>'}</td>
-                  <td class="num right">${m.pecaRec ? brl(m.pecaRec) : '<span class="muted">—</span>'}</td>
-                  <td class="num right" style="font-weight:700">${m.totRec ? brl(m.totRec) : '<span class="muted">—</span>'}</td>
-                  <td class="num right ${m.totCusto ? 'out-c' : ''}">${m.totCusto ? brl(m.totCusto) : '<span class="muted">—</span>'}</td>
-                  <td class="num right" style="font-weight:700;color:${m.totMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${hasData ? brl(m.totMargem) : '<span class="muted">—</span>'}</td>
-                ` : isServ ? `
-                  <td class="num right">${m.servRec ? brl(m.servRec) : '<span class="muted">—</span>'}</td>
-                  <td class="num right ${m.servCusto ? 'out-c' : ''}">${m.servCusto ? brl(m.servCusto) : '<span class="muted">—</span>'}</td>
-                  <td class="num right" style="font-weight:700;color:${m.servMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${m.servRec ? brl(m.servMargem) : '<span class="muted">—</span>'}</td>
-                  <td class="num right">${m.servRec ? (m.servMargem / m.servRec * 100).toFixed(1) + '%' : '<span class="muted">—</span>'}</td>
-                  <td class="num right">${m.entries.length}</td>
-                ` : `
-                  <td class="num right">${m.pecaRec ? brl(m.pecaRec) : '<span class="muted">—</span>'}</td>
-                  <td class="num right ${m.pecaCusto ? 'out-c' : ''}">${m.pecaCusto ? brl(m.pecaCusto) : '<span class="muted">—</span>'}</td>
-                  <td class="num right" style="font-weight:700;color:${m.pecaMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${m.pecaRec ? brl(m.pecaMargem) : '<span class="muted">—</span>'}</td>
-                  <td class="num right">${m.pecaRec ? (m.pecaMargem / m.pecaRec * 100).toFixed(1) + '%' : '<span class="muted">—</span>'}</td>
-                  <td class="num right">${m.entries.length}</td>
-                `}
-                <td class="right" style="white-space:nowrap">
-                  <button class="icon" data-act="saldosDrill" data-m="${m.m}" aria-label="Ver lançamentos de ${m.name}" title="Ver lançamentos de ${m.name}">
-                    ${ICON.eye}
-                  </button>
+              <tr data-id="${esc(item.id)}" style="cursor:pointer" title="Clique duas vezes ou use os botões para editar">
+                <td style="white-space:nowrap;font-weight:600">${fmtDate(item.date)}</td>
+                <td class="msld-os">${esc(item.os || '—')}</td>
+                <td><b>${esc(item.cliente)}</b></td>
+                <td>${catBadge(item.categoria)}</td>
+                <td style="text-align:center">${isEnt ? '<span class="chip ok">Entrada</span>' : '<span class="chip bad">Saída</span>'}</td>
+                <td class="num right msld-val-serv">${item.servicoCents ? (isEnt ? '+ ' : '− ') + numBR(item.servicoCents) : '<span class="muted">—</span>'}</td>
+                <td class="num right msld-val-peca">${item.pecasCents ? (isEnt ? '+ ' : '− ') + numBR(item.pecasCents) : '<span class="muted">—</span>'}</td>
+                <td class="num right msld-tot" style="color:${isEnt ? 'var(--ok)' : 'var(--red)'}">${(isEnt ? '+ ' : '− ') + numBR(item.totalCents)}</td>
+                <td><span class="msld-chip-pg">${esc(item.pagamento || 'PIX')}</span></td>
+                <td><span class="msld-chip-bk">${esc(item.banco || 'CAIXA')}</span></td>
+                <td style="font-size:12px;color:#64748b;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.obs || '')}">${esc(item.obs || '—')}</td>
+                <td class="right" style="white-space:nowrap;text-align:right">
+                  <button class="icon" data-act="manualEdit" data-id="${esc(item.id)}" title="Editar lançamento" aria-label="Editar">${ICON.edit}</button>
+                  <button class="icon d" data-act="manualDel" data-id="${esc(item.id)}" title="Excluir lançamento" aria-label="Excluir">${ICON.trash}</button>
                 </td>
               </tr>
             `;
           }).join('')}
+          ${!filteredList.length ? `
+            <tr>
+              <td colspan="12" style="text-align:center;padding:36px 16px;color:#64748b">
+                <div style="font-size:26px;margin-bottom:8px">📊</div>
+                <b>Nenhum lançamento encontrado nesta visualização.</b><br>
+                <span class="muted" style="font-size:13px">Clique no botão <b>"+ Novo Lançamento"</b> para preencher a sua planilha gerencial.</span>
+              </td>
+            </tr>
+          ` : ''}
         </tbody>
         <tfoot>
-          <tr style="font-weight:800;background:#f3f4f7">
-            <td>TOTAL DO PERÍODO</td>
-            ${isGeral ? `
-              <td class="num right">${brl(d.totServRec)}</td>
-              <td class="num right">${brl(d.totPecaRec)}</td>
-              <td class="num right" style="color:var(--tx)">${brl(d.totRec)}</td>
-              <td class="num right ${d.totCusto ? 'out-c' : ''}">${brl(d.totCusto)}</td>
-              <td class="num right" style="color:${d.totMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${brl(d.totMargem)}</td>
-            ` : isServ ? `
-              <td class="num right">${brl(d.totServRec)}</td>
-              <td class="num right ${d.totServCusto ? 'out-c' : ''}">${brl(d.totServCusto)}</td>
-              <td class="num right" style="color:${d.servMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${brl(d.servMargem)}</td>
-              <td class="num right">${d.servMargemPct.toFixed(1)}%</td>
-              <td class="num right">${d.filteredCount}</td>
-            ` : `
-              <td class="num right">${brl(d.totPecaRec)}</td>
-              <td class="num right ${d.totPecaCusto ? 'out-c' : ''}">${brl(d.totPecaCusto)}</td>
-              <td class="num right" style="color:${d.pecaMargem >= 0 ? 'var(--ok)' : 'var(--red)'}">${brl(d.pecaMargem)}</td>
-              <td class="num right">${d.pecaMargemPct.toFixed(1)}%</td>
-              <td class="num right">${d.filteredCount}</td>
-            `}
-            <td></td>
+          <tr>
+            <td colspan="5">TOTAL DA LISTA FILTRADA (${filteredList.length} registros)</td>
+            <td class="num right msld-val-serv">${brl(totServTab)}</td>
+            <td class="num right msld-val-peca">${brl(totPecaTab)}</td>
+            <td class="num right msld-tot">${brl(totGeralTab)}</td>
+            <td colspan="4"></td>
           </tr>
         </tfoot>
       </table>
     </div>
   `;
 
-  renderSaldosChart(d, st.tab);
+  // Bind filter events
+  $('#msld-y').addEventListener('change', e => { UI.saldos.year = +e.target.value; renderSaldos(); });
+  $('#msld-m').addEventListener('change', e => { UI.saldos.month = e.target.value; renderSaldos(); });
+  $('#msld-t').addEventListener('change', e => { UI.saldos.tipo = e.target.value; renderSaldos(); });
+  $('#msld-c').addEventListener('change', e => { UI.saldos.cat = e.target.value; renderSaldos(); });
+  $('#msld-p').addEventListener('change', e => { UI.saldos.pagamento = e.target.value; renderSaldos(); });
+  $('#msld-b').addEventListener('change', e => { UI.saldos.banco = e.target.value; renderSaldos(); });
+  $('#msld-q').addEventListener('input', debounce(e => { UI.saldos.q = e.target.value; renderSaldos(); }, 200));
 
-  $('#sld-y').addEventListener('change', e => { UI.saldos.year = +e.target.value; renderSaldos(); });
-  $('#sld-m').addEventListener('change', e => { UI.saldos.month = e.target.value; renderSaldos(); });
-  $('#sld-b').addEventListener('change', e => { UI.saldos.bank = e.target.value; renderSaldos(); });
-  $('#sld-sp').addEventListener('change', e => { UI.saldos.split = +e.target.value; renderSaldos(); });
-}
-
-function renderSaldosChart(d, tab) {
-  const host = $('#saldos-chart-container');
-  if (!host) return;
-
-  const isGeral = tab === 'geral';
-  const isServ = tab === 'servicos';
-
-  const sA = d.months.map(m => isGeral ? m.servRec / 100 : isServ ? m.servRec / 100 : m.pecaRec / 100);
-  const sB = d.months.map(m => isGeral ? m.pecaRec / 100 : isServ ? m.servCusto / 100 : m.pecaCusto / 100);
-
-  const colA = isGeral ? '#16A34A' : isServ ? '#16A34A' : '#FF2C2C';
-  const colB = isGeral ? '#FF2C2C' : isServ ? '#EAB308' : '#F97316';
-  const lblA = isGeral ? 'Serviços' : isServ ? 'Receita Serviços' : 'Venda Peças';
-  const lblB = isGeral ? 'Peças' : isServ ? 'Custos Mecânica' : 'Custos Aquisição';
-
-  const maxVal = Math.max(100, ...sA, ...sB);
-  const W = Math.max(280, host.clientWidth || 800), H = 260;
-  const L = 65, R = 20, T = 20, B = 35;
-  const plotW = W - L - R, plotH = H - T - B;
-
-  const x = i => L + (i / 11) * plotW;
-  const y = v => T + plotH - (v / maxVal) * plotH;
-
-  const ptsA = sA.map((v, i) => [x(i), y(v)]);
-  const ptsB = sB.map((v, i) => [x(i), y(v)]);
-
-  const pathA = monoPath(ptsA);
-  const pathB = monoPath(ptsB);
-  const areaA = pathA ? `${pathA}L${ptsA[ptsA.length - 1][0].toFixed(1)},${H - B}L${ptsA[0][0].toFixed(1)},${H - B}Z` : '';
-  const areaB = pathB ? `${pathB}L${ptsB[ptsB.length - 1][0].toFixed(1)},${H - B}L${ptsB[0][0].toFixed(1)},${H - B}Z` : '';
-
-  let gridHtml = '';
-  const steps = 4;
-  for (let s = 0; s <= steps; s++) {
-    const val = (maxVal / steps) * s;
-    const yPos = y(val);
-    gridHtml += `<line x1="${L}" x2="${W - R}" y1="${yPos}" y2="${yPos}" class="${s === 0 ? 'zero' : ''}"/>
-                 <text x="${L - 8}" y="${yPos + 4}" text-anchor="end">R$ ${Math.round(val).toLocaleString('pt-BR')}</text>`;
+  const clr = $('#msld-clear');
+  if (clr) {
+    clr.addEventListener('click', () => {
+      UI.saldos.month = 'ALL';
+      UI.saldos.tipo = 'ALL';
+      UI.saldos.cat = 'ALL';
+      UI.saldos.pagamento = 'ALL';
+      UI.saldos.banco = 'ALL';
+      UI.saldos.q = '';
+      renderSaldos();
+    });
   }
 
-  const xlHtml = d.months.map((m, i) => `<text x="${x(i)}" y="${H - 10}" text-anchor="middle">${m.shortName}</text>`).join('');
-
-  host.innerHTML = `
-    <svg class="cmp-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Evolução Mensal">
-      <defs>
-        <linearGradient id="sldGradA" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="${colA}" stop-opacity=".35"/>
-          <stop offset="1" stop-color="${colA}" stop-opacity="0"/>
-        </linearGradient>
-        <linearGradient id="sldGradB" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="${colB}" stop-opacity=".35"/>
-          <stop offset="1" stop-color="${colB}" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <g class="cg-grid">${gridHtml}</g>
-      <g class="cg-xl">${xlHtml}</g>
-      <g class="cg-s sB">
-        <path class="cg-area" fill="url(#sldGradB)" d="${areaB}"/>
-        <path class="cg-line" stroke="${colB}" d="${pathB}"/>
-      </g>
-      <g class="cg-s sA">
-        <path class="cg-area" fill="url(#sldGradA)" d="${areaA}"/>
-        <path class="cg-line" stroke="${colA}" d="${pathA}"/>
-      </g>
-      <line class="cg-guide" y1="${T}" y2="${H - B}" x1="0" x2="0"/>
-      <g class="cg-dots"></g>
-      <rect class="cg-hit" x="${L}" y="${T}" width="${plotW}" height="${plotH}" fill="transparent" style="cursor:crosshair"/>
-    </svg>
-    <div class="cmp-tip" role="status"></div>
-  `;
-
-  const tip = host.querySelector('.cmp-tip');
-  const guide = host.querySelector('.cg-guide');
-  const dots = host.querySelector('.cg-dots');
-  const hit = host.querySelector('.cg-hit');
-
-  const onHover = e => {
-    const rect = hit.getBoundingClientRect();
-    const relX = e.clientX - rect.left;
-    const idx = Math.max(0, Math.min(11, Math.round((relX / rect.width) * 11)));
-    const posX = x(idx);
-    guide.setAttribute('x1', posX);
-    guide.setAttribute('x2', posX);
-    guide.style.opacity = '1';
-
-    const vA = sA[idx] * 100;
-    const vB = sB[idx] * 100;
-    const yA = y(sA[idx]);
-    const yB = y(sB[idx]);
-
-    dots.innerHTML = `
-      <circle class="halo" cx="${posX}" cy="${yA}" r="8" fill="${colA}"/>
-      <circle cx="${posX}" cy="${yA}" r="4" fill="${colA}" stroke="#101014" stroke-width="2"/>
-      <circle class="halo" cx="${posX}" cy="${yB}" r="8" fill="${colB}"/>
-      <circle cx="${posX}" cy="${yB}" r="4" fill="${colB}" stroke="#101014" stroke-width="2"/>
-    `;
-
-    tip.innerHTML = `
-      <div class="tt-h">${d.months[idx].name} / ${UI.saldos.year}</div>
-      <div class="tt-r"><i style="background:${colA}"></i><span>${lblA}</span><b>${brl(vA)}</b></div>
-      <div class="tt-r"><i style="background:${colB}"></i><span>${lblB}</span><b>${brl(vB)}</b></div>
-      <div class="tt-d">
-        <span>${isGeral ? 'Total Faturamento' : 'Margem'}</span>
-        <b>${brl(isGeral ? vA + vB : vA - vB)}</b>
-      </div>
-    `;
-    tip.classList.add('on');
-
-    let tipLeft = (posX / W) * host.clientWidth + 12;
-    if (tipLeft + 200 > host.clientWidth) tipLeft = (posX / W) * host.clientWidth - 210;
-    tip.style.left = Math.max(4, tipLeft) + 'px';
-    tip.style.top = Math.max(10, Math.min(yA, yB) - 20) + 'px';
-  };
-
-  const onLeave = () => {
-    guide.style.opacity = '0';
-    dots.innerHTML = '';
-    tip.classList.remove('on');
-  };
-
-  hit.addEventListener('pointermove', onHover);
-  hit.addEventListener('pointerdown', onHover);
-  hit.addEventListener('pointerleave', onLeave);
-}
-
-function saldosDrill(month) {
-  const m = +month;
-  const st = UI.saldos;
-  const d = classifySaldosData(st.year, m, st.bank, st.split);
-  const bucket = d.months[m - 1];
-
-  openModal({
-    title: `Lançamentos de ${MONTHS[m - 1]} / ${st.year}`,
-    body: `
-      <div class="note" style="margin-bottom:12px">
-        Total de lançamentos no mês: <b>${bucket.entries.length}</b> · Faturamento Serviços: <b>${brl(bucket.servRec)}</b> · Peças: <b>${brl(bucket.pecaRec)}</b>
-      </div>
-      <div class="tw" style="max-height:50vh;overflow-y:auto">
-        <table class="t">
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Descrição</th>
-              <th>Conta bancária</th>
-              <th>Categoria</th>
-              <th>Tipo</th>
-              <th class="num right">Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${bucket.entries.map(e => {
-              const b = bankOf(e.bankId) || { name: '—' };
-              const a = accOf(e.code) || { name: 'Sem classificação' };
-              return `
-                <tr>
-                  <td class="num">${fmtDate(e.date)}</td>
-                  <td><b>${esc(e.desc || '—')}</b>${e.obs ? '<br><small class="muted">' + esc(e.obs) + '</small>' : ''}</td>
-                  <td>${esc(b.name)}</td>
-                  <td><span class="mono muted">${e.code || '—'}</span> ${esc(a.name)}</td>
-                  <td>${e.type === 'ENTRADA' ? '<span class="chip ok">Entrada</span>' : '<span class="chip gray">Saída</span>'}</td>
-                  <td class="num right" style="font-weight:700;color:${e.type === 'ENTRADA' ? 'var(--ok)' : 'var(--tx)'}">${brl(e.cents)}</td>
-                </tr>
-              `;
-            }).join('') || '<tr><td colspan="6" class="empty">Nenhum lançamento encontrado neste período.</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-    `,
-    foot: `<button class="btn pri" data-mclose>Fechar</button>`
+  // Row double-click to edit
+  $$('.msld-table tbody tr[data-id]').forEach(row => {
+    row.addEventListener('dblclick', () => manualEntryForm(row.dataset.id));
   });
 }
 
@@ -4947,8 +5138,20 @@ Object.assign(ACT, {
     UI.saldos.tab = el.dataset.tab;
     renderSaldos();
   },
-  saldosDrill(el) {
-    saldosDrill(el.dataset.m);
+  manualNew() {
+    manualEntryForm(null);
+  },
+  manualEdit(el) {
+    manualEntryForm(el.dataset.id);
+  },
+  manualDel(el) {
+    manualEntryDel(el.dataset.id);
+  },
+  manualCfg() {
+    manualCfgModal();
+  },
+  manualExport() {
+    exportManualSaldosExcel();
   }
 });
 
@@ -6326,7 +6529,10 @@ async function boot() {
       await S.repo.commit(ops);
       d.banks = cleanBanks;
     }
-    Object.assign(S, { accounts: d.accounts, banks: d.banks, entries: d.entries, rules: d.rules, recons: d.recons, batches: d.batches, audit: d.audit, meta: Object.fromEntries(d.meta.map(m => [m.key, m.value])) });
+    let localManual = [];
+    try { localManual = JSON.parse(localStorage.getItem('torque_manual_saldos') || '[]'); } catch (_) { }
+    const initialManual = (d.manual_saldos && d.manual_saldos.length) ? d.manual_saldos : localManual;
+    Object.assign(S, { accounts: d.accounts, banks: d.banks, entries: d.entries, rules: d.rules, recons: d.recons, batches: d.batches, audit: d.audit, manual_saldos: initialManual, meta: Object.fromEntries(d.meta.map(m => [m.key, m.value])) });
     if (!S.meta.seeded && !d.banks.length && !d.accounts.length) {
       const sd = seedFromPlan(PLAN);
       await commitOps([...sd.accounts.map(a => ({ store: 'accounts', op: 'put', value: a })), ...sd.banks.map(b => ({ store: 'banks', op: 'put', value: b })), { store: 'meta', op: 'put', value: { key: 'seeded', value: new Date().toISOString() } }, aud('CARGA INICIAL', 'system', '-', null, { contas: sd.accounts.length, bancos: sd.banks.length }, 'Plano de contas e contas bancárias da planilha')]);
