@@ -956,9 +956,32 @@ body.theme-dark .seg label:hover { background: #202736; }
 body.theme-dark .vsw button { background: #181d27; border-color: var(--bd); color: var(--tx2); }
 body.theme-dark .vsw button:hover { background: #202736; color: #fff; }
 body.theme-dark .vsw button.on { background: var(--red); color: #fff; border-color: var(--red); }
-body.theme-dark .sel-menu { background: #181d27; border-color: var(--bd); color: var(--tx); box-shadow: 0 16px 36px rgba(0,0,0,0.6); }
-body.theme-dark .sel-menu button { color: var(--tx); }
-body.theme-dark .sel-menu button:hover, body.theme-dark .sel-menu button.on { background: #252d3d; color: #fff; }
+body.theme-dark .sel-btn { background: #1b202c; border-color: var(--bd); color: var(--tx); }
+body.theme-dark .sel-btn:hover { border-color: #3b445b; }
+body.theme-dark .sel-btn:disabled { background: #12151d; color: #64748b; }
+body.theme-dark .sel-pop, body.theme-dark .sel-menu { background: #151923; border-color: var(--bd); color: var(--tx); box-shadow: 0 16px 44px rgba(0,0,0,0.7); }
+body.theme-dark .sel-pop button, body.theme-dark .sel-menu button { color: var(--tx); }
+body.theme-dark .sel-pop button:hover, body.theme-dark .sel-pop button:focus-visible,
+body.theme-dark .sel-pop button.on, body.theme-dark .sel-menu button:hover, body.theme-dark .sel-menu button.on {
+  background: #252d3d; color: #fff;
+}
+body.theme-dark .sel-pop button.on { color: var(--red); font-weight: 700; }
+body.theme-dark .cal { background: #151923; border-color: var(--bd); color: var(--tx); box-shadow: 0 16px 44px rgba(0,0,0,0.7); }
+body.theme-dark .cal-h b { color: #fff; }
+body.theme-dark .cal-w i { color: var(--tx2); }
+body.theme-dark .cal-g button { color: var(--tx); }
+body.theme-dark .cal-g button:hover { background: #252d3d; color: #fff; }
+body.theme-dark .cal-g button.td { box-shadow: inset 0 0 0 1.5px var(--red); color: #ff6b6b; font-weight: 700; }
+body.theme-dark .cal-g button.sel { background: var(--red); color: #fff; }
+body.theme-dark .cal-f { border-top-color: var(--bd); }
+body.theme-dark .cal-f button { color: var(--red); }
+body.theme-dark .cal-f button:hover { background: rgba(255,44,44,0.15); }
+body.theme-dark .picker { background: #151923; border-color: var(--bd); color: var(--tx); box-shadow: 0 16px 44px rgba(0,0,0,0.7); }
+body.theme-dark .picker input { background: #1b202c; border-bottom-color: var(--bd); color: var(--tx); }
+body.theme-dark .picker .grp { background: #10131b; color: var(--tx2); }
+body.theme-dark .picker .it { color: var(--tx); }
+body.theme-dark .picker .it:hover, body.theme-dark .picker .it.on { background: #252d3d; }
+body.theme-dark .picker .none { color: var(--tx2); }
 body.theme-dark .note { background: #1b2230; border-color: #2e384d; color: #cbd5e1; }
 body.theme-dark .cfg-tabs { background: var(--card); border-color: var(--bd); }
 body.theme-dark .cfg-tabs button { color: var(--tx2); }
@@ -4514,6 +4537,31 @@ const DEFAULT_MANUAL_CATEGORIAS = [
   'GASTOS OPERACIONAIS'
 ];
 
+const DEFAULT_MANUAL_BANCOS = [
+  'BANCO DO BRASIL',
+  'CAIXA',
+  'ITAÚ',
+  'BRADESCO',
+  'SANTANDER',
+  'INTER',
+  'NUBANK',
+  'SICOOB',
+  'SICREDI',
+  'DINHEIRO'
+];
+
+function getManualBankNames(extra) {
+  const activeBanks = (typeof S !== 'undefined' && S.banks) ? S.banks.map(b => b.name) : [];
+  const fromEntries = (typeof S !== 'undefined' && Array.isArray(S.manual_saldos))
+    ? S.manual_saldos.map(x => x.banco).filter(Boolean)
+    : [];
+  const extras = (extra ? [extra] : []);
+  const all = [...DEFAULT_MANUAL_BANCOS, ...activeBanks, ...fromEntries, ...extras]
+    .map(b => String(b || '').trim().toUpperCase())
+    .filter(b => b && b !== 'OUTRO');
+  return [...new Set(all)].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
 const DEFAULT_PAGAMENTOS = [
   'PIX',
   'Cartão de Crédito',
@@ -4557,7 +4605,7 @@ function catBadge(cat) {
 function calculateManualTotals(list, initialCfg) {
   let entServ = 0, saiServ = 0;
   let entPeca = 0, saiPeca = 0;
-  let despGeral = 0;
+  let entGeral = 0, despGeral = 0;
 
   list.forEach(item => {
     const serv = item.servicoCents || 0;
@@ -4567,10 +4615,19 @@ function calculateManualTotals(list, initialCfg) {
     if (item.tipo === 'ENTRADA') {
       entServ += serv;
       entPeca += peca;
+      if (!serv && !peca && tot > 0) {
+        if (item.categoria === 'SERVIÇO') entServ += tot;
+        else if (item.categoria === 'FORNECEDOR DE PEÇAS') entPeca += tot;
+        else entGeral += tot;
+      }
     } else {
       saiServ += serv;
       saiPeca += peca;
-      if (item.afeta === 'geral' || ['SALÁRIO', 'GASTOS OPERACIONAIS', 'OUTROS'].includes(item.categoria)) {
+      if (!serv && !peca && tot > 0) {
+        if (item.categoria === 'SERVIÇO') saiServ += tot;
+        else if (item.categoria === 'FORNECEDOR DE PEÇAS') saiPeca += tot;
+        else despGeral += tot;
+      } else if (item.afeta === 'geral' || ['SALÁRIO', 'GASTOS OPERACIONAIS', 'OUTROS'].includes(item.categoria)) {
         if (!serv && !peca) despGeral += tot;
       }
     }
@@ -4578,18 +4635,19 @@ function calculateManualTotals(list, initialCfg) {
 
   const saldoServPeriodo = entServ - saiServ;
   const saldoPecaPeriodo = entPeca - saiPeca;
-  const saldoGeralPeriodo = saldoServPeriodo + saldoPecaPeriodo;
+  const saldoGeralPeriodo = saldoServPeriodo + saldoPecaPeriodo + entGeral;
 
   const saldoServAcumulado = (initialCfg.saldoInicialServicos || 0) + saldoServPeriodo;
   const saldoPecaAcumulado = (initialCfg.saldoInicialPecas || 0) + saldoPecaPeriodo;
-  const saldoGeralAcumulado = saldoServAcumulado + saldoPecaAcumulado;
+  const saldoGeralAcumulado = saldoServAcumulado + saldoPecaAcumulado + entGeral - despGeral;
   const resultadoGerencialConsolidado = saldoGeralPeriodo - despGeral;
 
   return {
     entServ, saiServ, saldoServPeriodo, saldoServAcumulado,
     entPeca, saiPeca, saldoPecaPeriodo, saldoPecaAcumulado,
+    entGeral, despGeral,
     saldoGeralPeriodo, saldoGeralAcumulado,
-    despGeral, resultadoGerencialConsolidado
+    resultadoGerencialConsolidado
   };
 }
 
@@ -4675,8 +4733,12 @@ function manualEntryForm(id) {
   const isEdit = !!id;
   const item0 = isEdit ? (S.manual_saldos || []).find(x => x.id === id) : null;
   const cats = getManualCategorias();
-  const activeBanks = S.banks || [];
-  const bankNames = [...new Set([...activeBanks.map(b => b.name), 'CAIXA', 'BANCO DO BRASIL', 'ITAÚ', 'INTER', 'DINHEIRO'])];
+  const bankNames = getManualBankNames(item0 ? item0.banco : null);
+  const selectedBanco = item0 ? (item0.banco || 'BANCO DO BRASIL').toUpperCase() : 'BANCO DO BRASIL';
+  if (selectedBanco && !bankNames.includes(selectedBanco) && selectedBanco !== 'OUTRO') {
+    bankNames.push(selectedBanco);
+    bankNames.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }
 
   const m = openModal({
     title: isEdit ? 'Editar Lançamento na Planilha' : 'Novo Lançamento na Planilha',
@@ -4739,11 +4801,16 @@ function manualEntryForm(id) {
           </div>
           <div class="fld">
             <label for="mef-bk">Banco / Conta</label>
-            <input class="in" id="mef-bk" name="banco" list="mef-bk-list" placeholder="Selecione ou digite o banco" value="${esc(item0 ? item0.banco || '' : 'BANCO DO BRASIL')}">
-            <datalist id="mef-bk-list">
-              ${bankNames.map(b => `<option value="${esc(b)}">`).join('')}
-            </datalist>
+            <select class="in" id="mef-bk" name="banco">
+              ${bankNames.map(b => `<option value="${esc(b)}" ${selectedBanco === b ? 'selected' : ''}>${esc(b)}</option>`).join('')}
+              <option value="OUTRO" ${selectedBanco === 'OUTRO' ? 'selected' : ''}>OUTRO (Especificar...)</option>
+            </select>
           </div>
+        </div>
+
+        <div class="fld" id="mef-bk-custom-box" style="margin-top:-6px;display:${selectedBanco === 'OUTRO' ? 'flex' : 'none'};">
+          <label for="mef-bk-custom">Nome do Banco / Conta Personalizado</label>
+          <input class="in" id="mef-bk-custom" placeholder="Ex: C6 BANK, SAFRA, COOPERATIVA..." value="${selectedBanco === 'OUTRO' ? esc(item0 ? item0.banco : '') : ''}">
         </div>
 
         <div class="fld">
@@ -4759,6 +4826,19 @@ function manualEntryForm(id) {
       <button class="btn pri" id="mef-save">${isEdit ? 'Salvar Alterações' : 'Adicionar Lançamento'}</button>
     `
   });
+
+  const bkSel = $('#mef-bk', m.el);
+  const bkCustomBox = $('#mef-bk-custom-box', m.el);
+  const bkCustomIn = $('#mef-bk-custom', m.el);
+  if (bkSel && bkCustomBox) {
+    bkSel.addEventListener('change', () => {
+      const isOutro = bkSel.value === 'OUTRO';
+      bkCustomBox.style.display = isOutro ? 'flex' : 'none';
+      if (isOutro && bkCustomIn) {
+        setTimeout(() => bkCustomIn.focus(), 60);
+      }
+    });
+  }
 
   const updateTotFromParts = () => {
     const sCents = parseMoney($('#mef-serv', m.el).value) || 0;
@@ -4833,6 +4913,13 @@ function manualEntryForm(id) {
       return;
     }
 
+    let finalBanco = (d.banco || '').trim().toUpperCase();
+    if (finalBanco === 'OUTRO') {
+      const customVal = (bkCustomIn ? bkCustomIn.value : '').trim().toUpperCase();
+      finalBanco = customVal || 'OUTRO';
+    }
+    if (!finalBanco) finalBanco = 'BANCO DO BRASIL';
+
     const entry = {
       id: item0 ? item0.id : uid(),
       date,
@@ -4844,7 +4931,7 @@ function manualEntryForm(id) {
       pecasCents: pecaCents,
       totalCents: totCents,
       pagamento: d.pagamento || 'PIX',
-      banco: (d.banco || '').trim() || 'CAIXA',
+      banco: finalBanco,
       obs: (d.obs || '').trim(),
       afeta: (d.categoria === 'SALÁRIO' || d.categoria === 'GASTOS OPERACIONAIS' || d.categoria === 'OUTROS') ? 'geral' : (servCents && pecaCents ? 'ambos' : servCents ? 'servicos' : pecaCents ? 'pecas' : 'geral'),
       createdAt: item0 ? item0.createdAt : new Date().toISOString(),
@@ -5080,8 +5167,7 @@ function renderSaldos() {
   (S.manual_saldos || []).forEach(x => { if (x.date) ys.add(+x.date.slice(0, 4)); });
   const yearsList = [...ys].sort((a, b) => b - a);
   const cats = getManualCategorias();
-  const activeBanks = S.banks || [];
-  const bankNames = [...new Set([...activeBanks.map(b => b.name), 'CAIXA', 'BANCO DO BRASIL', 'ITAÚ', 'INTER', 'DINHEIRO'])];
+  const bankNames = getManualBankNames(st.banco !== 'ALL' ? st.banco : null);
 
   let totServTab = 0, totPecaTab = 0, totGeralTab = 0;
   filteredList.forEach(x => {
