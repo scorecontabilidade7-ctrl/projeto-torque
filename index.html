@@ -2,6 +2,18 @@
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>TORQUE</title>
 <meta name="theme-color" content="#FF2C2C">
+<script>
+(function(){
+  try {
+    var t = localStorage.getItem('torque_theme');
+    if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+    if (t === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.classList.add('theme-dark');
+    }
+  } catch(e) {}
+})();
+</script>
 <link rel="icon" href="data:image/png;base64,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">
 <style>
 :root{
@@ -870,11 +882,12 @@ textarea.in{resize:vertical;min-height:84px;line-height:1.45;padding:10px 12px}
 .vl.v-in,.vl.v-out,.t.fxt tr:hover .vl.v-in,.t.fxt tr:hover .vl.v-out{background:none;color:#4b5565;padding:0;border-radius:0;font-weight:700}
 
 /* ===== CONTROLE MANUAL DE SALDOS: Planilha Digital Interativa ===== */
-.msld-table{table-layout:auto;width:100%;min-width:980px}
-.msld-table th{background:#f8fafc;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;padding:10px 8px;border-bottom:1.5px solid #e2e8f0;white-space:nowrap}
-.msld-table td{padding:9px 8px;font-size:13px;vertical-align:middle;border-bottom:1px solid #f1f5f9;transition:background .12s}
+.msld-table{table-layout:auto;width:100%;min-width:1060px}
+.msld-table th{background:#f8fafc;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-weight:700;padding:10px 10px;border-bottom:1.5px solid #e2e8f0;white-space:nowrap}
+.msld-table td{padding:10px 10px;font-size:13px;vertical-align:middle;border-bottom:1px solid #f1f5f9;transition:background .12s}
 .msld-table tbody tr:hover td{background:#f8fafc}
-.msld-table tfoot td{background:#f8fafc;font-weight:800;border-top:2px solid #cbd5e1;padding:12px 8px}
+.msld-table tfoot td{background:#f8fafc;font-weight:800;border-top:2px solid #cbd5e1;padding:12px 10px}
+.msld-table th.num,.msld-table td.num{white-space:nowrap!important;font-variant-numeric:tabular-nums;text-align:right}
 .cat-badge{display:inline-flex;align-items:center;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:0.02em;white-space:nowrap}
 .cat-badge.sp{background:#EEF2FF;color:#4338CA;border:1px solid rgba(99,102,241,0.25)}
 .cat-badge.serv{background:#ECFDF5;color:#047857;border:1px solid rgba(16,185,129,0.25)}
@@ -883,12 +896,87 @@ textarea.in{resize:vertical;min-height:84px;line-height:1.45;padding:10px 12px}
 .cat-badge.op{background:#FEF2F2;color:#B91C1C;border:1px solid rgba(239,68,68,0.25)}
 .cat-badge.out{background:#F1F5F9;color:#475569;border:1px solid rgba(148,163,184,0.25)}
 .msld-os{font-family:var(--mono);font-weight:700;color:#64748b;font-size:12px}
-.msld-tot{font-weight:800;font-variant-numeric:tabular-nums}
-.msld-val-serv{color:#15803d;font-weight:600;font-variant-numeric:tabular-nums}
-.msld-val-peca{color:#0284c7;font-weight:600;font-variant-numeric:tabular-nums}
-.msld-val-sai{color:#dc2626;font-weight:600;font-variant-numeric:tabular-nums}
+.msld-tot{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.msld-val-serv{color:#15803d;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.msld-val-peca{color:#0284c7;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.msld-val-sai{color:#dc2626;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .msld-chip-pg{background:#f1f5f9;color:#334155;font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid #e2e8f0;font-weight:600}
 .msld-chip-bk{background:#f8fafc;color:#475569;font-size:11px;padding:2px 7px;border-radius:4px;border:1px solid #e2e8f0;font-weight:700;font-family:var(--mono)}
+
+/* ===== TEMA: Botão de alternância e estilos para Modo Escuro ===== */
+.theme-pill{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:99px;font-size:12px;font-weight:700;border:1px solid var(--bd);background:var(--card);color:var(--tx);transition:all .2s var(--ease);margin-right:10px;white-space:nowrap}
+.theme-pill:hover{border-color:var(--red);color:var(--red);box-shadow:0 2px 8px rgba(255,44,44,.15)}
+.theme-pill .theme-i{display:grid;place-items:center;width:16px;height:16px}
+.theme-pill svg{width:15px;height:15px;display:block}
+@media (max-width:700px){.theme-pill span{display:none}.theme-pill{padding:8px;margin-right:6px}}
+
+[data-theme="dark"], body.theme-dark {
+  --bg: #0b0d13;
+  --card: #151923;
+  --tx: #f3f4f6;
+  --tx2: #94a3b8;
+  --bd: #232938;
+  --red: #ff3b30;
+  --red-d: #e02820;
+  --red-l: rgba(255, 59, 48, 0.16);
+  --ok: #22c55e;
+  --ok-l: rgba(34, 197, 94, 0.16);
+  --warn: #f59e0b;
+  --warn-l: rgba(245, 158, 11, 0.16);
+  --side: #080a0e;
+  --side2: #161a24;
+  --sh: 0 2px 10px rgba(0,0,0,.5);
+}
+body.theme-dark { background: var(--bg); color: var(--tx); }
+body.theme-dark .main { background: var(--bg); }
+body.theme-dark .top { background: rgba(16, 20, 29, 0.94); border-bottom-color: var(--bd); }
+body.theme-dark .crumb b, body.theme-dark .top .crumb h1 { color: var(--tx); }
+body.theme-dark .card { background: var(--card); border-color: var(--bd); color: var(--tx); }
+body.theme-dark .card.kpi.k6 { background: var(--card); border-color: var(--bd); }
+body.theme-dark .card.kpi.dark { background: #11141c; }
+body.theme-dark .kpi .ki { background: rgba(255,255,255,0.06); color: #94a3b8; }
+body.theme-dark .in, body.theme-dark select.in, body.theme-dark textarea.in { background: #1b202c; border-color: var(--bd); color: var(--tx); }
+body.theme-dark .in:focus, body.theme-dark select.in:focus, body.theme-dark textarea.in:focus { border-color: var(--red); background: #202636; }
+body.theme-dark .in::placeholder, body.theme-dark textarea.in::placeholder { color: #64748b; }
+body.theme-dark .in[readonly] { background: #12151d !important; border-color: var(--bd); color: var(--tx); }
+body.theme-dark .btn:not(.pri):not(.danger) { background: #1b202c; border-color: var(--bd); color: var(--tx); }
+body.theme-dark .btn:not(.pri):not(.danger):hover { background: #252d3d; border-color: #3b445b; color: #fff; }
+body.theme-dark .user-chip, body.theme-dark .cloud-pill, body.theme-dark .theme-pill { background: var(--card); border-color: var(--bd); color: var(--tx); }
+body.theme-dark .fbar { background: var(--card); border-color: var(--bd); }
+body.theme-dark .md { background: #151923; border: 1px solid var(--bd); color: var(--tx); box-shadow: 0 20px 50px rgba(0,0,0,0.7); }
+body.theme-dark .md-foot { border-top-color: var(--bd); background: #10131b; }
+body.theme-dark .toast { background: #181d27; border-color: var(--bd); color: var(--tx); box-shadow: 0 12px 32px rgba(0,0,0,0.6); }
+body.theme-dark .t th, body.theme-dark .msld-table th { background: #181d27; color: #94a3b8; border-bottom: 1.5px solid var(--bd); }
+body.theme-dark .t td, body.theme-dark .msld-table td { border-bottom-color: #1e2534; color: var(--tx); }
+body.theme-dark .t tbody tr:hover td, body.theme-dark .msld-table tbody tr:hover td { background: #1b212d; }
+body.theme-dark .msld-table tfoot td { background: #181d27; border-top: 2px solid var(--bd); color: var(--tx); }
+body.theme-dark .seg { background: #10131b; border-color: var(--bd); }
+body.theme-dark .seg label { background: #181d27; color: var(--tx2); }
+body.theme-dark .seg label:hover { background: #202736; }
+body.theme-dark .vsw button { background: #181d27; border-color: var(--bd); color: var(--tx2); }
+body.theme-dark .vsw button:hover { background: #202736; color: #fff; }
+body.theme-dark .vsw button.on { background: var(--red); color: #fff; border-color: var(--red); }
+body.theme-dark .sel-menu { background: #181d27; border-color: var(--bd); color: var(--tx); box-shadow: 0 16px 36px rgba(0,0,0,0.6); }
+body.theme-dark .sel-menu button { color: var(--tx); }
+body.theme-dark .sel-menu button:hover, body.theme-dark .sel-menu button.on { background: #252d3d; color: #fff; }
+body.theme-dark .note { background: #1b2230; border-color: #2e384d; color: #cbd5e1; }
+body.theme-dark .cfg-tabs { background: var(--card); border-color: var(--bd); }
+body.theme-dark .cfg-tabs button { color: var(--tx2); }
+body.theme-dark .cfg-tabs button:hover { background: rgba(255,44,44,0.15); color: #ff6b6b; }
+body.theme-dark .cfg-tabs button.on { background: var(--red); color: #fff; }
+body.theme-dark .chip.gray { background: #1f2636; color: #94a3b8; border-color: #2d3748; }
+body.theme-dark .msld-chip-pg, body.theme-dark .msld-chip-bk { background: #1e2535; border-color: #2d3748; color: #cbd5e1; }
+body.theme-dark .cat-badge.sp { background: rgba(99,102,241,0.22); color: #c7d2fe; border-color: rgba(99,102,241,0.4); }
+body.theme-dark .cat-badge.serv { background: rgba(16,185,129,0.22); color: #a7f3d0; border-color: rgba(16,185,129,0.4); }
+body.theme-dark .cat-badge.peca { background: rgba(14,165,233,0.22); color: #bae6fd; border-color: rgba(14,165,233,0.4); }
+body.theme-dark .cat-badge.sal { background: rgba(245,158,11,0.22); color: #fde68a; border-color: rgba(245,158,11,0.4); }
+body.theme-dark .cat-badge.op { background: rgba(239,68,68,0.22); color: #fecaca; border-color: rgba(239,68,68,0.4); }
+body.theme-dark .cat-badge.out { background: rgba(148,163,184,0.22); color: #e2e8f0; border-color: rgba(148,163,184,0.4); }
+body.theme-dark .msld-val-serv { color: #4ade80; }
+body.theme-dark .msld-val-peca { color: #38bdf8; }
+body.theme-dark .msld-val-sai { color: #f87171; }
+body.theme-dark .cloud-card { background: var(--card); border-color: var(--bd); color: var(--tx); }
+body.theme-dark .cloud-steps { color: var(--tx2); }
 
 /* ===== nuvem ===== */
 .cloud-pill{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:99px;font-size:12px;font-weight:700;border:1px solid var(--bd);background:#fff;color:var(--tx2);transition:all .2s var(--ease);margin-right:10px;white-space:nowrap}
@@ -2758,7 +2846,9 @@ const ICON = {
   swap: ico('<path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/>'),
   chev: ico('<path d="M6 9l6 6 6-6"/>'),
   check: ico('<path d="M5 12l5 5 9-10"/>'),
-  list: ico('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>')
+  list: ico('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),
+  sun: ico('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'),
+  moon: ico('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>')
 };
 
 /* ------------------------------------------------ persistência + auditoria */
@@ -4636,7 +4726,7 @@ function manualEntryForm(id) {
           </div>
           <div class="fld">
             <label for="mef-tot">Total Geral (R$)</label>
-            <input class="in" id="mef-tot" name="total" placeholder="R$ 0,00" value="${item0 && item0.totalCents ? 'R$ ' + numBR(item0.totalCents) : 'R$ 0,00'}" readonly style="background:#f8fafc;font-weight:700">
+            <input class="in" id="mef-tot" name="total" data-money inputmode="numeric" placeholder="R$ 0,00" value="${item0 && item0.totalCents ? 'R$ ' + numBR(item0.totalCents) : ''}" style="font-weight:700">
           </div>
         </div>
 
@@ -4670,14 +4760,53 @@ function manualEntryForm(id) {
     `
   });
 
-  const calcTot = () => {
+  const updateTotFromParts = () => {
     const sCents = parseMoney($('#mef-serv', m.el).value) || 0;
     const pCents = parseMoney($('#mef-peca', m.el).value) || 0;
-    const totCents = sCents + pCents;
-    $('#mef-tot', m.el).value = 'R$ ' + numBR(totCents);
+    if (sCents > 0 || pCents > 0) {
+      const totCents = sCents + pCents;
+      $('#mef-tot', m.el).value = 'R$ ' + numBR(totCents);
+    }
   };
-  $('#mef-serv', m.el).addEventListener('input', calcTot);
-  $('#mef-peca', m.el).addEventListener('input', calcTot);
+
+  const updatePartsFromTot = () => {
+    const totVal = $('#mef-tot', m.el).value;
+    const totCents = parseMoney(totVal) || 0;
+    const sVal = ($('#mef-serv', m.el).value || '').trim();
+    const pVal = ($('#mef-peca', m.el).value || '').trim();
+    const cat = $('#mef-cat', m.el).value;
+    if (!sVal && !pVal && totCents > 0) {
+      if (cat === 'SERVIÇO') {
+        $('#mef-serv', m.el).value = 'R$ ' + numBR(totCents);
+      } else if (cat === 'FORNECEDOR DE PEÇAS') {
+        $('#mef-peca', m.el).value = 'R$ ' + numBR(totCents);
+      }
+    }
+  };
+
+  $('#mef-serv', m.el).addEventListener('input', updateTotFromParts);
+  $('#mef-peca', m.el).addEventListener('input', updateTotFromParts);
+  $('#mef-tot', m.el).addEventListener('input', updatePartsFromTot);
+
+  $('#mef-cat', m.el).addEventListener('change', e => {
+    const cat = e.target.value;
+    const totCents = parseMoney($('#mef-tot', m.el).value) || 0;
+    if (totCents > 0) {
+      if (cat === 'SERVIÇO') {
+        $('#mef-serv', m.el).value = 'R$ ' + numBR(totCents);
+        $('#mef-peca', m.el).value = '';
+      } else if (cat === 'FORNECEDOR DE PEÇAS') {
+        $('#mef-peca', m.el).value = 'R$ ' + numBR(totCents);
+        $('#mef-serv', m.el).value = '';
+      }
+    }
+    const radios = $$('input[name=tipo]', m.el);
+    if (['FORNECEDOR DE PEÇAS', 'SALÁRIO', 'GASTOS OPERACIONAIS'].includes(cat)) {
+      radios.forEach(r => { r.checked = (r.value === 'SAIDA'); });
+    } else if (['SERV + PEÇAS', 'SERVIÇO'].includes(cat)) {
+      radios.forEach(r => { r.checked = (r.value === 'ENTRADA'); });
+    }
+  });
 
   const doSave = async () => {
     const f = $('#mef', m.el);
@@ -4688,14 +4817,19 @@ function manualEntryForm(id) {
       $('#mef-err', m.el).innerHTML = '<div class="err">Informe o cliente ou descrição do lançamento.</div>';
       return;
     }
-    const servCents = parseMoney(d.servico) || 0;
-    const pecaCents = parseMoney(d.pecas) || 0;
-    let totCents = servCents + pecaCents;
-    if (totCents === 0 && d.total) {
-      totCents = parseMoney(d.total) || 0;
+    let servCents = parseMoney(d.servico) || 0;
+    let pecaCents = parseMoney(d.pecas) || 0;
+    let totCents = parseMoney(d.total) || 0;
+
+    if (totCents === 0 && (servCents || pecaCents)) {
+      totCents = servCents + pecaCents;
+    } else if (totCents > 0 && servCents === 0 && pecaCents === 0) {
+      if (d.categoria === 'SERVIÇO') servCents = totCents;
+      else if (d.categoria === 'FORNECEDOR DE PEÇAS') pecaCents = totCents;
     }
-    if (totCents === 0) {
-      $('#mef-err', m.el).innerHTML = '<div class="err">Informe o valor de serviços, peças ou o total.</div>';
+
+    if (totCents === 0 && servCents === 0 && pecaCents === 0) {
+      $('#mef-err', m.el).innerHTML = '<div class="err">Informe o valor de serviços, peças ou o total geral.</div>';
       return;
     }
 
@@ -4712,7 +4846,7 @@ function manualEntryForm(id) {
       pagamento: d.pagamento || 'PIX',
       banco: (d.banco || '').trim() || 'CAIXA',
       obs: (d.obs || '').trim(),
-      afeta: (d.categoria === 'SALÁRIO' || d.categoria === 'GASTOS OPERACIONAIS' || d.categoria === 'OUTROS') ? 'geral' : (servCents && pecaCents ? 'ambos' : servCents ? 'servicos' : 'pecas'),
+      afeta: (d.categoria === 'SALÁRIO' || d.categoria === 'GASTOS OPERACIONAIS' || d.categoria === 'OUTROS') ? 'geral' : (servCents && pecaCents ? 'ambos' : servCents ? 'servicos' : pecaCents ? 'pecas' : 'geral'),
       createdAt: item0 ? item0.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -5045,18 +5179,18 @@ function renderSaldos() {
       <table class="t msld-table">
         <thead>
           <tr>
-            <th style="width:105px">Data</th>
-            <th style="width:80px">Nº OS</th>
-            <th>Cliente / Descrição</th>
-            <th style="width:140px">Categoria</th>
-            <th style="width:85px;text-align:center">Tipo</th>
-            <th class="num right" style="width:120px">Serviço (R$)</th>
-            <th class="num right" style="width:120px">Peças (R$)</th>
-            <th class="num right" style="width:130px">Total Geral</th>
-            <th style="width:110px">Pagamento</th>
-            <th style="width:110px">Banco</th>
-            <th>Observações</th>
-            <th class="right" style="width:80px;text-align:right">Ações</th>
+            <th style="width:105px;white-space:nowrap">Data</th>
+            <th style="width:85px;white-space:nowrap">Nº OS</th>
+            <th style="min-width:180px">Cliente / Descrição</th>
+            <th style="width:150px;white-space:nowrap">Categoria</th>
+            <th style="width:90px;text-align:center;white-space:nowrap">Tipo</th>
+            <th class="num right" style="min-width:135px;width:135px;white-space:nowrap">Serviço (R$)</th>
+            <th class="num right" style="min-width:135px;width:135px;white-space:nowrap">Peças (R$)</th>
+            <th class="num right" style="min-width:145px;width:145px;white-space:nowrap">Total Geral</th>
+            <th style="width:120px;white-space:nowrap">Pagamento</th>
+            <th style="width:130px;white-space:nowrap">Banco</th>
+            <th style="min-width:150px">Observações</th>
+            <th class="right" style="width:85px;text-align:right;white-space:nowrap">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -5069,9 +5203,9 @@ function renderSaldos() {
                 <td><b>${esc(item.cliente)}</b></td>
                 <td>${catBadge(item.categoria)}</td>
                 <td style="text-align:center">${isEnt ? '<span class="chip ok">Entrada</span>' : '<span class="chip bad">Saída</span>'}</td>
-                <td class="num right msld-val-serv">${item.servicoCents ? (isEnt ? '+ ' : '− ') + numBR(item.servicoCents) : '<span class="muted">—</span>'}</td>
-                <td class="num right msld-val-peca">${item.pecasCents ? (isEnt ? '+ ' : '− ') + numBR(item.pecasCents) : '<span class="muted">—</span>'}</td>
-                <td class="num right msld-tot" style="color:${isEnt ? 'var(--ok)' : 'var(--red)'}">${(isEnt ? '+ ' : '− ') + numBR(item.totalCents)}</td>
+                <td class="num right msld-val-serv" style="white-space:nowrap" title="Serviço: ${brl(item.servicoCents || 0)}">${item.servicoCents ? (isEnt ? '+ ' : '− ') + 'R$ ' + numBR(item.servicoCents) : '<span class="muted">R$ 0,00</span>'}</td>
+                <td class="num right msld-val-peca" style="white-space:nowrap" title="Peças: ${brl(item.pecasCents || 0)}">${item.pecasCents ? (isEnt ? '+ ' : '− ') + 'R$ ' + numBR(item.pecasCents) : '<span class="muted">R$ 0,00</span>'}</td>
+                <td class="num right msld-tot" style="white-space:nowrap;color:${isEnt ? 'var(--ok)' : 'var(--red)'}" title="Total Geral: ${brl(item.totalCents || 0)}">${(isEnt ? '+ ' : '− ') + 'R$ ' + numBR(item.totalCents || 0)}</td>
                 <td><span class="msld-chip-pg">${esc(item.pagamento || 'PIX')}</span></td>
                 <td><span class="msld-chip-bk">${esc(item.banco || 'CAIXA')}</span></td>
                 <td style="font-size:12px;color:#64748b;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.obs || '')}">${esc(item.obs || '—')}</td>
@@ -5095,9 +5229,9 @@ function renderSaldos() {
         <tfoot>
           <tr>
             <td colspan="5">TOTAL DA LISTA FILTRADA (${filteredList.length} registros)</td>
-            <td class="num right msld-val-serv">${brl(totServTab)}</td>
-            <td class="num right msld-val-peca">${brl(totPecaTab)}</td>
-            <td class="num right msld-tot">${brl(totGeralTab)}</td>
+            <td class="num right msld-val-serv" style="white-space:nowrap">${brl(totServTab)}</td>
+            <td class="num right msld-val-peca" style="white-space:nowrap">${brl(totPecaTab)}</td>
+            <td class="num right msld-tot" style="white-space:nowrap">${brl(totGeralTab)}</td>
             <td colspan="4"></td>
           </tr>
         </tfoot>
@@ -6495,6 +6629,41 @@ document.addEventListener('click', ev => {
 window.addEventListener('hashchange', () => { if (!S.me) return; const r = location.hash.slice(1); if (ROUTES[r] && r !== UI.route) go(r); });
 window.addEventListener('error', e => { console.error(e.error || e.message); });
 
+function applyTheme(theme, save = true) {
+  const isDark = theme === 'dark';
+  document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  document.documentElement.classList.toggle('theme-dark', isDark);
+  document.documentElement.classList.toggle('theme-light', !isDark);
+  if (document.body) {
+    document.body.classList.toggle('theme-dark', isDark);
+    document.body.classList.toggle('theme-light', !isDark);
+  }
+  if (save) {
+    try { localStorage.setItem('torque_theme', isDark ? 'dark' : 'light'); } catch (_) { }
+  }
+  const btn = $('#themePill');
+  if (btn) {
+    btn.innerHTML = `<i class="theme-i">${isDark ? ICON.sun : ICON.moon}</i><span>${isDark ? 'Modo Claro' : 'Modo Escuro'}</span>`;
+    btn.setAttribute('aria-label', isDark ? 'Mudar para modo claro' : 'Mudar para modo escuro');
+    btn.title = isDark ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro';
+  }
+}
+
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('torque_theme'); } catch (_) { }
+  if (!saved) {
+    saved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  applyTheme(saved, false);
+}
+
+ACT.themeToggle = () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || (document.body && document.body.classList.contains('theme-dark'));
+  applyTheme(isDark ? 'light' : 'dark', true);
+  toast(isDark ? 'Modo Claro ativado' : 'Modo Escuro ativado', 'ok', 1800);
+};
+
 async function boot() {
   $('#app').innerHTML = `
   <aside class="side" id="side" aria-label="Menu principal">
@@ -6509,8 +6678,9 @@ async function boot() {
     </nav>
     <div class="side-foot"><button data-act="sysOpen" data-tip="Dados, backup e testes">${ICON.db}<span>Dados, backup e testes</span></button><button data-act="logout" class="out" data-tip="Sair do TORQUE">${ICON.logout}<span>Sair do TORQUE</span></button></div>
   </aside>
-  <div class="main"><header class="top"><button class="burger" id="burger" aria-label="Abrir menu">${ICON.menu}</button><div class="crumb"><b>TORQUE</b><span class="sl">/</span><h1 id="title"></h1></div><div class="sub hide" id="subtitle"></div><span class="grow"></span><button class="cloud-pill gray" id="cloudPill" data-act="cloudGo" aria-label="Estado da nuvem"></button><div class="user-chip" id="userChip" style="display:none"></div></header><main id="view" tabindex="-1"></main></div>${authMarkup()}`;
+  <div class="main"><header class="top"><button class="burger" id="burger" aria-label="Abrir menu">${ICON.menu}</button><div class="crumb"><b>TORQUE</b><span class="sl">/</span><h1 id="title"></h1></div><div class="sub hide" id="subtitle"></div><span class="grow"></span><button class="theme-pill" id="themePill" data-act="themeToggle" aria-label="Alternar modo escuro e claro" title="Alternar entre modo escuro e claro"></button><button class="cloud-pill gray" id="cloudPill" data-act="cloudGo" aria-label="Estado da nuvem"></button><div class="user-chip" id="userChip" style="display:none"></div></header><main id="view" tabindex="-1"></main></div>${authMarkup()}`;
   bindAuth();
+  initTheme();
   try { setSideMin(localStorage.getItem('torque_side_min') === '1', false); } catch (_) { }
   $('#burger').addEventListener('click', () => $('#side').classList.toggle('open'));
   try {
